@@ -24,11 +24,11 @@ COMMIT_MSG_FILE=$1
 COMMIT_SOURCE=$2
 SHA1=$3
 
-# /usr/bin/perl -i.bak -ne 'print unless(m/^. Please enter the commit message/..m/^#$/)' "$COMMIT_MSG_FILE"
+/usr/bin/perl -i.bak -ne 'print unless(m/^. Please enter the commit message/..m/^#$/)' "$COMMIT_MSG_FILE"
 
 if [[ -z "$COMMIT_SOURCE" ]]
 then
-  echo "# Please enter the commit message for your changes. " > "$COMMIT_MSG_FILE"
+  # echo "# Please enter the commit message for your changes. " > "$COMMIT_MSG_FILE"
   for FILE in $(git diff --cached --name-only -r)
   do
     # According to files changed the commit message would start "<project_name>: <commit_message>"
@@ -37,5 +37,6 @@ then
     # <project>/file.txt     - "<project>:" 
     echo "# $FILE: <commit_message>" | sed -E 's|src/+||g' | sed -r 's/(.*)(\/[a-z0-9.-]+)/\1 /' >> "$COMMIT_MSG_FILE"  
   done
+  echo "#  " > "$COMMIT_MSG_FILE"
 fi
 
