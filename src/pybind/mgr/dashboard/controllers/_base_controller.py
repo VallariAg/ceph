@@ -239,8 +239,7 @@ class BaseController:
         def inner(*args, **kwargs):
             client_version = None
             for key, value in kwargs.items():
-                if isinstance(value, str):
-                    kwargs[key] = unquote(value)
+                kwargs[key] = unquote(value) if isinstance(value, str) else value
 
             # Process method arguments.
             params = get_request_body_params(cherrypy.request)
@@ -265,21 +264,17 @@ class BaseController:
 
             else:
                 ret = func(*args, **kwargs)
-            if isinstance(ret, bytes):
-                ret = ret.decode('utf-8')
+
+            ret = ret.decode('utf-8') if isinstance(ret, bytes) else ret
+
+            def get_content_type_header(type, version):
+                return f"application/vnd.ceph.api.v{version}+{type}" if version else f"application/{type}"
+
             if xml:
-                if version:
-                    cherrypy.response.headers['Content-Type'] = \
-                        'application/vnd.ceph.api.v{}+xml'.format(version)
-                else:
-                    cherrypy.response.headers['Content-Type'] = 'application/xml'
+                cherrypy.response.headers['Content-Type'] = get_content_type_header('xml', version)
                 return ret.encode('utf8')
             if json_response:
-                if version:
-                    cherrypy.response.headers['Content-Type'] = \
-                        'application/vnd.ceph.api.v{}+json'.format(version)
-                else:
-                    cherrypy.response.headers['Content-Type'] = 'application/json'
+                cherrypy.response.headers['Content-Type'] = get_content_type_header('json', version)
                 ret = json.dumps(ret).encode('utf8')
             return ret
         return inner

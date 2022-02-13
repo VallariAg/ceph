@@ -267,8 +267,40 @@ class Docs(BaseController):
 
         return parameters
 
+    def _process_func_attr(self, func):
+        summary = ''
+        version = None
+        response = {}
+        p_info = []
+
+        for attr in ['__method_map_method__', '__resource_method__', '__collection_method__']:
+            if hasattr(func, attr):
+                version = func[attr]['version']
+                break
+        if hasattr(func, 'doc_info'):
+            if func.doc_info['summary']:
+                summary = func.doc_info['summary']
+            response = func.doc_info['response']
+            p_info = func.doc_info['parameters']
+
+        return summary, version, response, p_info
+
+    def _get_params(self, cls, endpoint, para_info):
+        params = []
+
+        def extend_params(endpoint_params, param_name):
+            if endpoint_params:
+                params.extend(
+                    cls._gen_params(
+                        cls._add_param_info(endpoint_params, para_info), param_name))
+
+        extend_params(endpoint.path_params, 'path')
+        extend_params(endpoint.query_params, 'query')
+
+        return params
+
     @classmethod
-    def gen_paths(cls, all_endpoints):
+    def gen_paths(self, cls, all_endpoints):
         # pylint: disable=R0912
         method_order = ['get', 'post', 'put', 'delete']
         paths = {}
@@ -287,34 +319,8 @@ class Docs(BaseController):
                 method = endpoint.method
                 func = endpoint.func
 
-                summary = ''
-                version = None
-                resp = {}
-                p_info = []
-
-                if hasattr(func, '__method_map_method__'):
-                    version = func.__method_map_method__['version']
-
-                elif hasattr(func, '__resource_method__'):
-                    version = func.__resource_method__['version']
-
-                elif hasattr(func, '__collection_method__'):
-                    version = func.__collection_method__['version']
-
-                if hasattr(func, 'doc_info'):
-                    if func.doc_info['summary']:
-                        summary = func.doc_info['summary']
-                    resp = func.doc_info['response']
-                    p_info = func.doc_info['parameters']
-                params = []
-                if endpoint.path_params:
-                    params.extend(
-                        cls._gen_params(
-                            cls._add_param_info(endpoint.path_params, p_info), 'path'))
-                if endpoint.query_params:
-                    params.extend(
-                        cls._gen_params(
-                            cls._add_param_info(endpoint.query_params, p_info), 'query'))
+                summary, version, resp, p_info = self._process_func_attr(func)
+                params = self._get_params(cls, endpoint, p_info)
 
                 methods[method.lower()] = {
                     'tags': [cls._get_tag(endpoint)],
@@ -325,26 +331,22 @@ class Docs(BaseController):
                 if summary:
                     methods[method.lower()]['summary'] = summary
 
-                if method.lower() in ['post', 'put']:
-                    if endpoint.body_params:
-                        body_params = cls._add_param_info(endpoint.body_params, p_info)
+                def set_params(param):
+                    if param:
+                        params_info = cls._add_param_info(param, p_info)
                         methods[method.lower()]['requestBody'] = {
                             'content': {
                                 'application/json': {
-                                    'schema': cls._gen_schema_for_content(body_params)}}}
+                                    'schema': cls._gen_schema_for_content(params_info)}}}
 
-                    if endpoint.query_params:
-                        query_params = cls._add_param_info(endpoint.query_params, p_info)
-                        methods[method.lower()]['requestBody'] = {
-                            'content': {
-                                'application/json': {
-                                    'schema': cls._gen_schema_for_content(query_params)}}}
+                if method.lower() in ['post', 'put']:
+                    set_params(endpoint.body_params)
+                    set_params(endpoint.query_params)
 
                 if endpoint.is_secure:
                     methods[method.lower()]['security'] = [{'jwt': []}]
 
-            if not skip:
-                paths[path] = methods
+            paths[path] = methods if not skip else paths[path]
 
         return paths
 

@@ -59,20 +59,17 @@ class Osd(RESTController):
 
         # Extending by osd stats information
         for stat in mgr.get('osd_stats')['osd_stats']:
-            if stat['osd'] in osds:
-                osds[stat['osd']]['osd_stats'] = stat
+            osds[stat['osd']]['osd_stats'] = stat if stat['osd'] in osds else osds[stat['osd']]['osd_stats']
 
         # Extending by osd node information
         nodes = mgr.get('osd_map_tree')['nodes']
         for node in nodes:
-            if node['type'] == 'osd' and node['id'] in osds:
-                osds[node['id']]['tree'] = node
+            osds[node['id']]['tree'] = node if node['type'] == 'osd' and node['id'] in osds else osds[node['id']]['tree']
 
         # Extending by osd parent node information
         for host in [n for n in nodes if n['type'] == 'host']:
             for osd_id in host['children']:
-                if osd_id >= 0 and osd_id in osds:
-                    osds[osd_id]['host'] = host
+                osds[osd_id]['host'] = host if osd_id >= 0 and osd_id in osds else osds[osd_id]['host']
 
         removing_osd_ids = self.get_removing_osds()
 

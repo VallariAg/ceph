@@ -130,6 +130,33 @@ class CephFS(RESTController):
             return
         mds_versions[metadata.get('ceph_version', 'unknown')].append(metadata_key)
 
+    def _find_standby_replays(self, mdsmap_info, rank_table):
+        # pylint: disable=unused-variable
+        for gid_str, daemon_info in mdsmap_info.items():
+            if daemon_info['state'] != "up:standby-replay":
+                continue
+
+            inos = mgr.get_latest("mds", daemon_info['name'], "mds_mem.ino")
+            dns = mgr.get_latest("mds", daemon_info['name'], "mds_mem.dn")
+            dirs = mgr.get_latest("mds", daemon_info['name'], "mds_mem.dir")
+            caps = mgr.get_latest("mds", daemon_info['name'], "mds_mem.cap")
+
+            activity = CephService.get_rate(
+                "mds", daemon_info['name'], "mds_log.replay")
+
+            rank_table.append(
+                {
+                    "rank": "{0}-s".format(daemon_info['rank']),
+                    "state": "standby-replay",
+                    "mds": daemon_info['name'],
+                    "activity": activity,
+                    "dns": dns,
+                    "inos": inos,
+                    "dirs": dirs,
+                    "caps": caps
+                }
+            )
+
     # pylint: disable=too-many-statements,too-many-branches
     def fs_status(self, fs_id):
         mds_versions: dict = defaultdict(list)
@@ -161,20 +188,16 @@ class CephFS(RESTController):
                 dirs = mgr.get_latest("mds", info['name'], "mds_mem.dir")
                 caps = mgr.get_latest("mds", info['name'], "mds_mem.cap")
 
-                if rank == 0:
-                    client_count = mgr.get_latest("mds", info['name'],
-                                                  "mds_sessions.session_count")
-                elif client_count == 0:
-                    # In case rank 0 was down, look at another rank's
-                    # sessionmap to get an indication of clients.
+                # In case rank 0 was down, look at another rank's
+                # sessionmap to get an indication of clients.
+                if rank == 0 or client_count == 0:
                     client_count = mgr.get_latest("mds", info['name'],
                                                   "mds_sessions.session_count")
 
                 laggy = "laggy_since" in info
 
                 state = info['state'].split(":")[1]
-                if laggy:
-                    state += "(laggy)"
+                state = f"{state}(laggy)" if laggy else state
 
                 # Populate based on context of state, e.g. client
                 # ops for an active daemon, replay progress, reconnect
@@ -214,32 +237,7 @@ class CephFS(RESTController):
                     }
                 )
 
-        # Find the standby replays
-        # pylint: disable=unused-variable
-        for gid_str, daemon_info in mdsmap['info'].items():
-            if daemon_info['state'] != "up:standby-replay":
-                continue
-
-            inos = mgr.get_latest("mds", daemon_info['name'], "mds_mem.ino")
-            dns = mgr.get_latest("mds", daemon_info['name'], "mds_mem.dn")
-            dirs = mgr.get_latest("mds", daemon_info['name'], "mds_mem.dir")
-            caps = mgr.get_latest("mds", daemon_info['name'], "mds_mem.cap")
-
-            activity = CephService.get_rate(
-                "mds", daemon_info['name'], "mds_log.replay")
-
-            rank_table.append(
-                {
-                    "rank": "{0}-s".format(daemon_info['rank']),
-                    "state": "standby-replay",
-                    "mds": daemon_info['name'],
-                    "activity": activity,
-                    "dns": dns,
-                    "inos": inos,
-                    "dirs": dirs,
-                    "caps": caps
-                }
-            )
+        self._find_standby_replays(mdsmap['info'], rank_table)
 
         df = mgr.get("df")
         pool_stats = {p['id']: p['stats'] for p in df['pools']}
