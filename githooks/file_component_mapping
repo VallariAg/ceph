@@ -1,0 +1,3 @@
+doc/*                      doc
+src/mon/*                  mon
+src/pybind/mgr/dashboard/* mgr/dashboard

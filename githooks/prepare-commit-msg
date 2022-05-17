@@ -1,47 +1,67 @@
-#!/usr/bin/sh
-#
-# An example hook script to prepare the commit log message.
-# Called by "git commit" with the name of the file that has the
-# commit message, followed by the description of the commit
-# message's source.  The hook's purpose is to edit the commit
-# message file.  If the hook fails with a non-zero status,
-# the commit is aborted.
-#
-# To enable this hook, rename this file to "prepare-commit-msg".
+#!/usr/bin/python
 
-# This hook includes three examples. The first one removes the
-# "# Please enter the commit message..." help message.
-#
-# The second includes the output of "git diff --name-status -r"
-# into the message, just before the "git status" output.  It is
-# commented because it doesn't cope with --amend or with squashed
-# commits.
-#
-# The third example adds a Signed-off-by line to the message, that can
-# still be edited.  This is rarely a good idea.
+import subprocess
+import csv
+import sys
+import fnmatch
+import re
+import os
 
-COMMIT_MSG_FILE=$1
-COMMIT_SOURCE=$2
-SHA1=$3
+ROOT_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
 
-/usr/bin/perl -i.bak -ne 'print unless(m/^. Please enter the commit message/..m/^#$/)' "$COMMIT_MSG_FILE"
+# file_component_mapping = open('./file_component_mapping', newline='')
+file_component_mapping = open(ROOT_DIR + '/githooks/file_component_mapping', newline='')
+mapping_file_reader = csv.reader(file_component_mapping, delimiter=' ', skipinitialspace=True)
 
-if [[ -z "$COMMIT_SOURCE" ]]
-then
-  echo "# Possible commit messages: " >> "$COMMIT_MSG_FILE"
-  for FILE in $(git diff --cached --name-only -r)
-  do
-    # According to files changed the commit message would start "<project_name>: <commit_message>"
-    # src/<project>/file.txt - "<project>:"
-    # file.txt               - "file.txt:"
-    # <project>/file.txt     - "<project>:" 
-    echo "# $FILE: <commit_message>" | sed -E 's|src/+||g' | sed -r 's/(.*)(\/[a-z0-9.-]+)/\1 /' >> "$COMMIT_MSG_FILE"  
-  done
-fi
+file_component_dict = {}
 
-SOB=$(git var GIT_COMMITTER_IDENT | sed -n 's/^\(.*>\).*$/Signed-off-by: \1/p')
-git interpret-trailers --in-place --trailer "$SOB" "$COMMIT_MSG_FILE"
-if test -z "$COMMIT_SOURCE"
-then
-  /usr/bin/perl -i.bak -pe 'print "\n" if !$first_line++' "$COMMIT_MSG_FILE"
-fi
+for row in mapping_file_reader:
+  file_component_dict[row[0]] = row[1]
+  # file_path = row[0]
+  # component_name = row[1]
+  # print(row)
+
+commit_msg_filepath = sys.argv[1]
+
+commit_msg_filepath = ROOT_DIR + "/.git/COMMIT_EDITMSG"
+# if len(sys.argv) > 2:
+#   commit_type = sys.argv[2]
+# else:
+#   commit_type = ''
+# if len(sys.argv) > 3:
+#   commit_hash = sys.argv[3]
+# else:
+#   commit_hash = ''
+# print("prepare-commit-msg: File: %s\nType: %s\nHash: %s" % (commit_msg_filepath, commit_type, commit_hash))
+
+with open(commit_msg_filepath, 'r+') as f:
+  content = f.read()
+  print(content)
+  result = re.search('Signed-off-by', content)
+  print(result, 'babao')
+  # f.seek(0, 0)
+  # f.write("ISSUE-%s %s" % (issue_number, content))
+
+files_changed = subprocess.check_output(['git','diff','--cached','--name-only']).decode("utf-8") 
+files_changed = files_changed.split("\n")
+
+components = []
+
+for files in file_component_dict:
+  matched = fnmatch.filter(files_changed, files)
+  if matched != []:
+    components += [file_component_dict[files]]
+  print(matched, files, file_component_dict[files])
+print(components)
+
+SOB = os.popen("git var GIT_COMMITTER_IDENT | sed -n 's/^\(.*>\).*$/Signed-off-by: \1/p'")
+print(SOB)
+
+
+print(sys.argv[2])
+
+with open(commit_msg_filepath, 'r+') as f:
+  content = f.read()
+  f.seek(0, 0)
+  f.write("ISSUE- %s" % (content))
+
