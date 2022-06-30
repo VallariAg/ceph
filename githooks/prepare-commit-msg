@@ -1,67 +1,44 @@
 #!/usr/bin/python
 
 import subprocess
-import csv
-import sys
-import fnmatch
-import re
-import os
+import re, os, sys
+
+from ComponentMapper import PathToComponent
+
 
 ROOT_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
+COMMIT_MSG_FILE = sys.argv[1]
 
-# file_component_mapping = open('./file_component_mapping', newline='')
-file_component_mapping = open(ROOT_DIR + '/githooks/file_component_mapping', newline='')
-mapping_file_reader = csv.reader(file_component_mapping, delimiter=' ', skipinitialspace=True)
+def get_signoff():
+  signoff_ = subprocess.check_output(['git', 'var', 'GIT_COMMITTER_IDENT'])
+  signoff_ = signoff_.decode('utf-8').split(' ')
+  signoff = f'Signed-off-by: {" ".join(signoff_[:-2])}'
+  return signoff 
 
-file_component_dict = {}
-
-for row in mapping_file_reader:
-  file_component_dict[row[0]] = row[1]
-  # file_path = row[0]
-  # component_name = row[1]
-  # print(row)
-
-commit_msg_filepath = sys.argv[1]
-
-commit_msg_filepath = ROOT_DIR + "/.git/COMMIT_EDITMSG"
-# if len(sys.argv) > 2:
-#   commit_type = sys.argv[2]
-# else:
-#   commit_type = ''
-# if len(sys.argv) > 3:
-#   commit_hash = sys.argv[3]
-# else:
-#   commit_hash = ''
-# print("prepare-commit-msg: File: %s\nType: %s\nHash: %s" % (commit_msg_filepath, commit_type, commit_hash))
-
-with open(commit_msg_filepath, 'r+') as f:
-  content = f.read()
-  print(content)
-  result = re.search('Signed-off-by', content)
-  print(result, 'babao')
-  # f.seek(0, 0)
-  # f.write("ISSUE-%s %s" % (issue_number, content))
-
-files_changed = subprocess.check_output(['git','diff','--cached','--name-only']).decode("utf-8") 
-files_changed = files_changed.split("\n")
-
-components = []
-
-for files in file_component_dict:
-  matched = fnmatch.filter(files_changed, files)
-  if matched != []:
-    components += [file_component_dict[files]]
-  print(matched, files, file_component_dict[files])
-print(components)
-
-SOB = os.popen("git var GIT_COMMITTER_IDENT | sed -n 's/^\(.*>\).*$/Signed-off-by: \1/p'")
-print(SOB)
+def get_titles():
+  files_changed = subprocess.check_output(['git','diff','--cached','--name-only'])
+  files_changed = files_changed.decode('utf-8').split('\n')
+  component_mapper = PathToComponent()
+  components = component_mapper.get_all_components(files_changed)
+  return components
 
 
-print(sys.argv[2])
-
-with open(commit_msg_filepath, 'r+') as f:
-  content = f.read()
+with open(COMMIT_MSG_FILE, 'r+') as f:
+  commit_txt = f.read()
   f.seek(0, 0)
-  f.write("ISSUE- %s" % (content))
+
+  f.write('#' * 72 + '\n') # indicator for 72 char long commit titles
+  f.write('# Possible commit titles:\n')
+  title_components = get_titles()
+  for component in title_components:
+    f.write(f'# {component}: <title>\n')
+
+  f.write("\n\n# Fixes: \n")
+
+  is_signoff = re.search(r'Signed-off-by', commit_txt)
+  if not is_signoff:
+    signoff = get_signoff()
+    f.write(signoff + '\n' + commit_txt)
+  else:
+    f.write(commit_txt[2:]) # remove two \n before signoff
 

@@ -23,13 +23,21 @@ class PathToComponent():
   # def does_component_exist(self, component: str) -> bool:
     # return component in self.map_
   
-  def get_component_name(self, path: str) -> str:
+  def get_component(self, path: str) -> str:
     if path in self.map_:
       return self.map_[path]
     file_dir, filename = os.path.split(path)
     if file_dir in [".", ""]: # file at root of the repo
       return filename
     return file_dir
+
+  def get_all_components(self, paths: list) -> list:
+    components = []
+    for path in paths:
+      component_ = self.get_component(path)
+      if component_:
+        components += [component_]
+    return components
 
 # print(PathToComponent().get_component_name(".somehing.tt"))
   
