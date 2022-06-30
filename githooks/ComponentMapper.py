@@ -37,7 +37,8 @@ class PathToComponent():
       component_ = self.get_component(path)
       if component_:
         components += [component_]
-    return components
+    return list(set(components))
+
 
 # print(PathToComponent().get_component_name(".somehing.tt"))
   
