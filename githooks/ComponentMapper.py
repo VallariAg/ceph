@@ -1,5 +1,5 @@
 import os, csv
-
+from collections import Counter
 
 class PathToComponent():
   def __init__(self) -> None:
@@ -27,7 +27,7 @@ class PathToComponent():
     if path in self.map_:
       return self.map_[path]
     file_dir, filename = os.path.split(path)
-    if file_dir in [".", ""]: # file at root of the repo
+    if file_dir in [".", "", "/"]: # file at root of the repo
       return filename
     return file_dir
 
@@ -37,7 +37,9 @@ class PathToComponent():
       component_ = self.get_component(path)
       if component_:
         components += [component_]
-    return list(set(components))
+
+    components = [item[0] for item in Counter(components).most_common()]
+    return (components)
 
 
 # print(PathToComponent().get_component_name(".somehing.tt"))
