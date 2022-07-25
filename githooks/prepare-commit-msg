@@ -28,20 +28,25 @@ try:
     commit_txt = commit_txt_.split("\n")
     f.seek(0, 0)
 
-    f.write("\n".join(commit_txt[:1]))
-    f.write('\n' + '#' * 72 + '\n') # indicator for 72 char long commit titles
-    f.write('# Possible commit titles:\n')
-    title_components = get_titles()
-    for component in title_components:
-      f.write(f'# {component}: <title>\n')
+    f.write(commit_txt[0] + "\n")
 
-    f.write("\n\n# Fixes: \n")
+    if commit_txt[0] == "": # editor used for commit msg
+      f.write('#' * 72 + '\n') # indicator for 72 char long commit titles
+      f.write('# Possible commit titles:\n')
+      title_components = get_titles()
+      for component in title_components:
+        f.write(f'# {component}: <title>\n')
+      f.write("\n\n# Fixes: \n")
 
     is_signoff = re.search(r'Signed-off-by', commit_txt_)
     if not is_signoff:
       signoff = get_signoff()
-      f.write(signoff + '\n')
-    # else:
-    f.write("\n".join(commit_txt[2:])) # remove two \n before signoff
+      f.write('\n' + signoff + '\n\n')
+
+    f.write("\n".join(commit_txt[1:]))
+
+# ############ remove
+#     f.seek(0, 0)
+#     print(f.read())
 except Exception as exc:
   print("Error in prepare-commit-msg hook: '{exc}'".format(exc=repr(exc)))
