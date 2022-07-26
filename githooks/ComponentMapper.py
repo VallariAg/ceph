@@ -47,6 +47,5 @@ class PathToComponent():
     sorted_components = [item[0] for item in Counter(components).most_common()]
     return sorted_components
 
-
 # print(PathToComponent().get_component_name(".somehing.tt"))
   
