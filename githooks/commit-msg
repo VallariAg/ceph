@@ -1,0 +1,16 @@
+#!/usr/bin/python
+
+import sys
+from ComponentMapper import PathToComponent
+
+
+COMMIT_MSG_FILE = sys.argv[1]
+print("commit-msg", COMMIT_MSG_FILE)
+
+# Check: Title should be 72 chars long
+
+# Check: Title should be in format `<component>: <message>`
+
+# Check: <component> should be a valid name from file_component_mapping
+# PathToComponent.does_component_exist(component)
+
