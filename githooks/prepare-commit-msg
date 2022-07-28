@@ -9,17 +9,23 @@ ROOT_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
 COMMIT_MSG_FILE = sys.argv[1]
 
 def get_signoff():
-  signoff_ = subprocess.check_output(['git', 'var', 'GIT_COMMITTER_IDENT'])
-  signoff_ = signoff_.decode('utf-8').split(' ')
-  signoff = f'Signed-off-by: {" ".join(signoff_[:-2])}'
-  return signoff 
+  try:
+    signoff_ = subprocess.check_output(['git', 'var', 'GIT_COMMITTER_IDENT'])
+    signoff_ = signoff_.decode('utf-8').split(' ')
+    signoff = f'Signed-off-by: {" ".join(signoff_[:-2])}'
+    return signoff
+  except:
+    print("Error reading commiter info for commit signature")
 
 def get_titles():
-  files_changed = subprocess.check_output(['git','diff','--cached','--name-only'])
-  files_changed = files_changed.decode('utf-8').split('\n')
-  component_mapper = PathToComponent()
-  components = component_mapper.get_all_components(files_changed)
-  return components
+  try:
+    files_changed = subprocess.check_output(['git','diff','--cached','--name-only'])
+    files_changed = files_changed.decode('utf-8').split('\n')
+    component_mapper = PathToComponent()
+    components = component_mapper.get_all_components(files_changed)
+    return components
+  except:
+    return []
 
 try:
   with open(COMMIT_MSG_FILE, 'r+') as f:
@@ -31,10 +37,10 @@ try:
 
     if commit_txt[0] == "": # editor used for commit msg
       f.write('#' * 72 + '\n') # 72 char title
-      f.write('# Possible commit titles:\n')
+      f.write('# Possible commit messages:\n')
       title_components = get_titles()
       for component in title_components:
-        f.write(f'# {component}: <title>\n')
+        f.write(f'# {component}: <commit_message>\n')
       f.write("\n\n# Fixes: \n")
 
     is_signoff = re.search(r'Signed-off-by', commit_txt_)
