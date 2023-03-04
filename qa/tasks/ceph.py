@@ -322,39 +322,13 @@ def valgrind_post(ctx, config):
     try:
         yield
     finally:
-        lookup_procs = list()
-        log.info('Checking for errors in any valgrind logs...')
-        for remote in ctx.cluster.remotes.keys():
-            # look at valgrind logs for each node
-            proc = remote.run(
-                args="sudo zgrep '<kind>' /var/log/ceph/valgrind/* "
-                     # include a second file so that we always get
-                     # a filename prefix on the output
-                     "/dev/null | sort | uniq",
-                wait=False,
-                check_status=False,
-                stdout=StringIO(),
-            )
-            lookup_procs.append((proc, remote))
-
         valgrind_exception = None
-        for (proc, remote) in lookup_procs:
-            proc.wait()
-            out = proc.stdout.getvalue()
-            for line in out.split('\n'):
-                if line == '':
-                    continue
-                try:
-                    (file, kind) = line.split(':')
-                except Exception:
-                    log.error('failed to split line %s', line)
-                    raise
-                log.debug('file %s kind %s', file, kind)
-                if (file.find('mds') >= 0) and kind.find('Lost') > 0:
-                    continue
-                log.error('saw valgrind issue %s in %s', kind, file)
-                valgrind_exception_text = ValgrindScanner(client=remote.ssh).get_exception_msg()
-                valgrind_exception = Exception(valgrind_exception_text)
+        valgrind_yaml = os.path.join(ctx.archive, 'valgrind.yaml')
+        for remote in ctx.cluster.remotes.keys():
+            error_msg = ValgrindScanner(remote, valgrind_yaml).get_exception_msg()
+            log.debug('valgrind exception message: %s', error_msg)
+            if error_msg and not valgrind_exception:
+                valgrind_exception = Exception("saw valgrind issues")
 
         if config.get('expect_valgrind_errors'):
             if not valgrind_exception:
