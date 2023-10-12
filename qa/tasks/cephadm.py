@@ -101,6 +101,45 @@ def update_archive_setting(ctx, key, value):
 
 
 @contextlib.contextmanager
+def nvmeof_context(ctx, config):
+    # IP=$(echo $(hostname -I) | cut -d ' ' -f1)
+    # GATEWAY=$(echo $s | cut -d "@" -f2- | sed 's/.\{8\}$//')
+    (remote,) = ctx.cluster.only('host.a').remotes.keys()
+    ip_address = remote.ip_address
+    log.info('ip_address: ' + str(ip_address))
+    # proc = remote.run(
+    #     args=['echo', "(systemctl list-units | grep nvmeof.mypool | awk '{print \$1}')", run.Raw('|'), 'cut', '-d', '"@"', '-f2-', run.Raw('|'), 'sed', "'s/.\{8\}$//'"],
+    #     stdout=StringIO(),
+    # )
+    # gateway_addr = proc.stdout.getvalue()
+    gateway_addr = remote.sh("systemctl list-units | grep nvmeof.mypool | awk '{print $1}' | xargs echo | cut -d '@' -f2- | sed 's/.\{8\}$//'",
+                             stdout=StringIO())
+    log.info('gateway_addr: ' + str(gateway_addr))
+    if gateway_addr:
+        gateway_addr = gateway_addr.strip()
+        log.info('gateway_addr2: ' + str(gateway_addr))
+    conf_data = dedent(f"""
+        [config]
+        ip_address = {ip_address}
+        gateway_addr = {gateway_addr}
+        """)
+    log.info('conf_data: ' + str(conf_data))
+
+    (target_remote,) = ctx.cluster.only('client.1').remotes.keys()
+    target_remote.write_file(
+        path='/etc/ceph/nvmeof.cfg',
+        data=conf_data,
+        sudo=True
+    )
+    log.info('config written successfully!')
+
+    try:
+        yield
+    finally:
+        pass
+
+
+@contextlib.contextmanager
 def normalize_hostnames(ctx):
     """
     Ensure we have short hostnames throughout, for consistency between
