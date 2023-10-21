@@ -44,40 +44,40 @@ tasks:
 - cephadm.wait_for_service:
     service: nvmeof.mypool
 
-- exec:
-    client.1:
-    - "modprobe nvme-fabrics"
-    - "modprobe nvme-tcp"
-    - |
-      set -ex
-      #
-      # print nvmeof start up logs
-      # s=$(systemctl list-units | grep nvmeof.mypool | awk '{print $1}')
-      # echo "<---- s variable is [ $s ]---->"
-      # PAGER=cat journalctl -u $s
-      GATEWAY=`cat /etc/ceph/nvmeof.cfg |grep 'gateway_addr' | awk -F'[, ]' '{print $3}'`
-      IP=`cat /etc/ceph/nvmeof.cfg |grep 'ip_address' | awk -F'[, ]' '{print $3}'`
-      HOSTNAME=$(hostname)
-      IMAGE="quay.io/ceph/nvmeof-cli:0.0.3"
-      POOL="mypool"
-      MIMAGE="myimage"
-      BDEV="mybdev"
-      SERIAL="SPDK00000000000001"
-      NQN="nqn.2016-06.io.spdk:cnode1"
-      PORT="4420"
-      SRPORT="5500"
-      podman run -it $IMAGE --server-address $IP --server-port $SRPORT create_bdev --pool $POOL --image $MIMAGE --bdev $BDEV
-      podman images
-      podman ps
-      podman run -it $IMAGE --server-address $IP --server-port $SRPORT create_subsystem --subnqn $NQN --serial $SERIAL
-      podman run -it $IMAGE --server-address $IP --server-port $SRPORT add_namespace --subnqn $NQN --bdev $BDEV
-      podman run -it $IMAGE --server-address $IP --server-port $SRPORT create_listener -n $NQN -g client.$GATEWAY -a $IP -s $PORT
-      podman run -it $IMAGE --server-address $IP --server-port $SRPORT add_host --subnqn $NQN --host "*"
-      podman run -it $IMAGE --server-address $IP --server-port $SRPORT get_subsystems
-      lsmod | grep nvme
-      nvme list
-      nvme connect -t tcp --traddr $IP -s $PORT -n $NQN
-      nvme list
+# - exec:
+#     client.1:
+#     - "modprobe nvme-fabrics"
+#     - "modprobe nvme-tcp"
+#     - |
+#       set -ex
+#       #
+#       # print nvmeof start up logs
+#       # s=$(systemctl list-units | grep nvmeof.mypool | awk '{print $1}')
+#       # echo "<---- s variable is [ $s ]---->"
+#       # PAGER=cat journalctl -u $s
+#       GATEWAY=`cat /etc/ceph/nvmeof.cfg |grep 'gateway_addr' | awk -F'[, ]' '{print $3}'`
+#       IP=`cat /etc/ceph/nvmeof.cfg |grep 'ip_address' | awk -F'[, ]' '{print $3}'`
+#       HOSTNAME=$(hostname)
+#       IMAGE="quay.io/ceph/nvmeof-cli:0.0.3"
+#       POOL="mypool"
+#       MIMAGE="myimage"
+#       BDEV="mybdev"
+#       SERIAL="SPDK00000000000001"
+#       NQN="nqn.2016-06.io.spdk:cnode1"
+#       PORT="4420"
+#       SRPORT="5500"
+#       podman run -it $IMAGE --server-address $IP --server-port $SRPORT create_bdev --pool $POOL --image $MIMAGE --bdev $BDEV
+#       podman images
+#       podman ps
+#       podman run -it $IMAGE --server-address $IP --server-port $SRPORT create_subsystem --subnqn $NQN --serial $SERIAL
+#       podman run -it $IMAGE --server-address $IP --server-port $SRPORT add_namespace --subnqn $NQN --bdev $BDEV
+#       podman run -it $IMAGE --server-address $IP --server-port $SRPORT create_listener -n $NQN -g client.$GATEWAY -a $IP -s $PORT
+#       podman run -it $IMAGE --server-address $IP --server-port $SRPORT add_host --subnqn $NQN --host "*"
+#       podman run -it $IMAGE --server-address $IP --server-port $SRPORT get_subsystems
+#       lsmod | grep nvme
+#       nvme list
+#       nvme connect -t tcp --traddr $IP -s $PORT -n $NQN
+#       nvme list
 
 #
 #- exec:
@@ -108,7 +108,8 @@ tasks:
 #      nvme connect -t tcp --traddr $IP -s $PORT -n $NQN
 #      nvme list
 
-#- workunit:
-#    clients:
-#      client.1:
-#        - cephadm/nvme_initiator.sh
+- workunit:
+    no_coverage_and_limits: true
+    clients:
+      client.1:
+        - cephadm/nvme_initiator.sh
