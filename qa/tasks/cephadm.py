@@ -101,6 +101,32 @@ def update_archive_setting(ctx, key, value):
 
 
 @contextlib.contextmanager
+def nvmeof_context(ctx, config):
+    (remote,) = ctx.cluster.only('host.a').remotes.keys()
+    ip_address = remote.ip_address
+    gateway_addr = remote.sh("systemctl list-units | grep nvmeof.mypool | awk '{print $1}' | xargs echo | cut -d '@' -f2- | sed 's/.\{8\}$//'",
+                             stdout=StringIO())
+    if gateway_addr:
+        gateway_addr = gateway_addr.strip()
+    conf_data = dedent(f"""
+        [config]
+        ip_address = {ip_address}
+        gateway_addr = {gateway_addr}
+        """)
+    (target_remote,) = ctx.cluster.only('client.1').remotes.keys()
+    target_remote.write_file(
+        path='/etc/ceph/nvmeof.cfg',
+        data=conf_data,
+        sudo=True
+    )
+
+    try:
+        yield
+    finally:
+        pass
+
+
+@contextlib.contextmanager
 def normalize_hostnames(ctx):
     """
     Ensure we have short hostnames throughout, for consistency between
