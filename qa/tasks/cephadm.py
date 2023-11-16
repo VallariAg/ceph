@@ -102,43 +102,6 @@ def update_archive_setting(ctx, key, value):
 
 
 @contextlib.contextmanager
-def nvmeof_gateway_cfg(ctx, config):
-    source_host = config.get('source')
-    target_host = config.get('target')
-    nvmeof_service = config.get('service')
-    if not (source_host and target_host and nvmeof_service):
-        raise ConfigError('nvmeof_gateway_cfg requires "source", "target", and "service"')
-    remote = list(ctx.cluster.only(source_host).remotes.keys())[0]
-    ip_address = remote.ip_address
-    gateway_name = ""
-    r = remote.run(args=[
-        'systemctl', 'list-units',
-        run.Raw('|'), 'grep', nvmeof_service
-    ], stdout=StringIO())
-    output = r.stdout.getvalue()
-    pattern_str = f"{re.escape(nvmeof_service)}(.*?)(?=\.service)"
-    pattern = re.compile(pattern_str)
-    match = pattern.search(output)
-    if match:
-        gateway_name = match.group()
-    conf_data = dedent(f"""
-        NVMEOF_GATEWAY_IP_ADDRESS={ip_address}
-        NVMEOF_GATEWAY_NAME={gateway_name}
-        """)
-    target_remote = list(ctx.cluster.only(target_host).remotes.keys())[0]
-    target_remote.write_file(
-        path='/etc/ceph/nvmeof.env',
-        data=conf_data,
-        sudo=True
-    )
-
-    try:
-        yield
-    finally:
-        pass
-
-
-@contextlib.contextmanager
 def normalize_hostnames(ctx):
     """
     Ensure we have short hostnames throughout, for consistency between

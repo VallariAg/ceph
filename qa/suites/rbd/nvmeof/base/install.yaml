@@ -10,23 +10,26 @@ tasks:
     - ceph orch host ls
     - ceph orch device ls
     - ceph osd lspools
-    # create pool
-    - ceph osd pool create mypool
-    - rbd pool init mypool
-    # deploy nvmeof
-    ## Uncomment to test specific nvmeof images
-    ## - ceph config set mgr mgr/cephadm/container_image_nvmeof quay.io/ceph/nvmeof:latest
-    - ceph orch apply nvmeof mypool --placement="1 $(hostname)"
-    - ceph orch ps --refresh
 
-- cephadm.wait_for_service:
-    service: nvmeof.mypool
-
-- cephadm.nvmeof_gateway_cfg:
-    source: host.a 
-    target: client.1
-    service: nvmeof.mypool
+- nvmeof:
+    image: default # test specific nvmeof images; example "latest"
+    client: client.0
+    gateway_config:
+        source: host.a 
+        target: client.1
+        vars:
+            pool_name: mypool
+            image_name: myimage
 
 - exec:
     client.0:
-      - journalctl -u $(systemctl list-units | grep nvmeof.mypool | awk '{print $1}')
+      - journalctl -u $(systemctl list-units | grep nvmeof.a | awk '{print $1}')
+
+- workunit:
+    no_coverage_and_limits: true
+    clients:
+      client.1:
+        - rbd/nvmeof_initiator.sh
+
+- nvmeof.basic_tests:
+    client: client.1

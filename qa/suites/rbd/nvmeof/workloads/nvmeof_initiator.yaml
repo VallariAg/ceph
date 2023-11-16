@@ -1,6 +1,9 @@
-tasks:
-- workunit:
-    no_coverage_and_limits: true
-    clients:
-      client.1:
-        - rbd/nvmeof_initiator.sh
+# tasks:
+# - workunit:
+#     no_coverage_and_limits: true
+#     clients:
+#       client.1:
+#         - cephadm/nvme_initiator.sh
+
+# - nvmeof.basic_tests:
+#     client: client.1

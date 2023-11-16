@@ -5,6 +5,7 @@ roles:
   - osd.0
   - osd.1
   - client.0
+  - ceph.nvmeof.nvmeof.a
 - - host.b
   - mon.b
   - osd.2
