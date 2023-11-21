@@ -12,7 +12,8 @@ tasks:
     - ceph osd lspools
 
 - nvmeof:
-    image: default # test specific nvmeof images; example "latest"
+    gateway_image: v0.0.6  # "default" uses packaged version; change to test specific nvmeof images, example "latest"
+    cli_image: v0.0.6
     client: client.0
     gateway_config:
         source: host.a 
