@@ -222,9 +222,10 @@ class BasicTests(Nvmeof):
         log.info(f"[nvmeof test]: nvme disconnect-all")
         self._run_cmd(args=["sudo", "nvme", "disconnect-all"])
         _, stdout, _ = self._run_cmd(args=[
-            "sudo", "nvme", "list", run.Raw('|'), "wc", "-l" 
+            "sudo", "nvme", "list"
         ])
-        assert 2 == int(stdout.strip()), f"Expected stdout: 2, but got: {int(stdout.strip())}"
+        removed_controller = "SPDK bdev Controller"
+        assert removed_controller not in stdout, f"Expected stdout: no {removed_controller}, but got: {stdout}"
         log.info(f"[nvmeof test]: test_nvmeof_disconnect_all successful!")
 
     def test_nvmeof_connect_all(self):
