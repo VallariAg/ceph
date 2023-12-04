@@ -6,7 +6,7 @@ sudo modprobe nvme-fabrics
 sudo modprobe nvme-tcp
 sudo dnf install nvme-cli -y
 
-# import NVMEOF_GATEWAY_IP_ADDRESS & NVMEOF_GATEWAY_NAME=nvmeof.poolname.smithiXXX.abcde
+# import NVMEOF_GATEWAY_IP_ADDRESS and NVMEOF_GATEWAY_NAME=nvmeof.poolname.smithiXXX.abcde
 source /etc/ceph/nvmeof.env
 
 HOSTNAME=$(hostname)
@@ -62,14 +62,13 @@ echo "Test 2: device size - passed!"
 echo "Test 3: basic IO - starting"
 nvme_drive=$(sudo nvme list --output-format=json | \
         jq -r ".Devices | .[] | select(.ModelNumber == \"$nvme_model\") | .DevicePath")
-io_input="Hello world"
 io_input_file="/tmp/nvmeof_test_input"
-echo "$io_input" > $io_input_file
-sudo dd if=$io_input_file of=$nvme_drive seek=0 count=1 bs=2k #write
+echo "Hello world" > $io_input_file
+truncate -s 2k $io_input_file
+sudo dd if=$io_input_file of=$nvme_drive oflag=direct count=1 bs=2k #write
 io_output_file="/tmp/nvmeof_test_output"
-sudo dd if=$nvme_drive of=$io_output_file seek=0 count=1 bs=2k #read
-io_output=$(<$io_output_file)
-if [ "$io_input" != "$io_output" ]; then
+sudo dd if=$nvme_drive of=$io_output_file iflag=direct count=1 bs=2k #read
+if ! cmp $io_input_file $io_output_file; then
   echo "nvmeof initiator - io test failed!"
   exit 1
 fi
