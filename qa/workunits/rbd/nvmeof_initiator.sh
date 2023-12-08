@@ -10,15 +10,13 @@ sudo dnf install nvme-cli -y
 source /etc/ceph/nvmeof.env
 
 HOSTNAME=$(hostname)
-IMAGE="quay.io/ceph/nvmeof-cli:latest"
-NVMEOF_POOL=$(awk -F'.' '{print $2}' <<< "$NVMEOF_GATEWAY_NAME")
-NVMEOF_RBD_IMAGE="myimage"
-RBD_SIZE=$((1024*8)) #8GiB
-NVMEOF_BDEV="mybdev"
-NVMEOF_SERIAL="SPDK00000000000001"
-NVMEOF_NQN="nqn.2016-06.io.spdk:cnode1"
-NVMEOF_PORT="4420"
-NVMEOF_SRPORT="5500"
+# NVMEOF_RBD_IMAGE="myimage"
+# RBD_SIZE=$((1024*8)) #8GiB
+# NVMEOF_BDEV="mybdev"
+# NVMEOF_SERIAL="SPDK00000000000001"
+# NVMEOF_NQN="nqn.2016-06.io.spdk:cnode1"
+# NVMEOF_PORT="4420"
+# NVMEOF_SRPORT="5500"
 # DISCOVERY_PORT="8009"
 
 # rbd create $NVMEOF_POOL/$NVMEOF_RBD_IMAGE --size $RBD_SIZE

@@ -12,3 +12,4 @@ roles:
   - osd.3
   - osd.4
   - client.1
+- - client.2 #TODO: "host" makes a ceph node I think

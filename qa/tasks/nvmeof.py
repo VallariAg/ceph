@@ -17,15 +17,18 @@ class Nvmeof(Task):
     Setup nvmeof gateway on client and then share gateway config to target host.
 
         - nvmeof:
-            gateway_image: default
-            cli_image: latest
             client: client.0
+            gateway_image: default
+            rbd:
+                pool_name: mypool
+                image_name: myimage
+                rbd_size: 1024 # MBs
             gateway_config:
                 source: host.a 
-                target: client.1
+                target: client.2
                 vars:
-                    pool_name: mypool
-                    image_name: myimage
+                    cli_image: latest
+                    
     """
 
     def setup(self):
@@ -49,16 +52,20 @@ class Nvmeof(Task):
 
     def _set_defaults(self):
         self.gateway_image = self.config.get('gateway_image', 'default')
-        self.cli_image = self.config.get('cli_image', 'latest')
+
+        rbd_config = self.config.get('rbd', {})
+        self.poolname = rbd_config.get('pool_name', 'mypool')
+        self.rbd_image_name = rbd_config.get('image_name', 'myimage')
+        self.rbd_size = rbd_config.get('rbd_size', 1024*8) # (1024*8) MBs = 2GBs
+
         gateway_config = self.config.get('gateway_config', {})
-        extra_conf = gateway_config.get('vars', {})
-        self.poolname = extra_conf.get('pool_name', 'mypool')
-        self.imagename = extra_conf.get('image_name', 'myimage')
-        self.bdev = extra_conf.get('bdev', 'mybdev')
-        self.serial = extra_conf.get('serial', 'SPDK00000000000001')
-        self.nqn = extra_conf.get('nqn', 'nqn.2016-06.io.spdk:cnode1')
-        self.port = extra_conf.get('port', '4420')
-        self.srport = extra_conf.get('srport', '5500')
+        conf_vars = gateway_config.get('vars', {})
+        self.cli_image = conf_vars.get('cli_image', 'latest')
+        self.bdev = conf_vars.get('bdev', 'mybdev')
+        self.serial = conf_vars.get('serial', 'SPDK00000000000001')
+        self.nqn = conf_vars.get('nqn', 'nqn.2016-06.io.spdk:cnode1')
+        self.port = conf_vars.get('port', '4420')
+        self.srport = conf_vars.get('srport', '5500')
 
     def deploy_nvmeof(self):
         """
@@ -91,27 +98,27 @@ class Nvmeof(Task):
                 ])
 
             poolname = self.poolname
-            imagename = self.imagename
+            imagename = self.rbd_image_name
 
-            log.info('[nvmeof]: ceph osd pool create mypool')
+            log.info(f'[nvmeof]: ceph osd pool create {poolname}')
             _shell(self.ctx, self.cluster_name, self.remote, [
                 'ceph', 'osd', 'pool', 'create', poolname
             ])
 
-            log.info('[nvmeof]: rbd pool init -p mypool')
+            log.info(f'[nvmeof]: rbd pool init {poolname}')
             _shell(self.ctx, self.cluster_name, self.remote, [
                 'rbd', 'pool', 'init', poolname
             ])
 
-            log.info('[nvmeof]: ceph orch apply nvmeof mypool')
+            log.info(f'[nvmeof]: ceph orch apply nvmeof {poolname}')
             _shell(self.ctx, self.cluster_name, self.remote, [
                 'ceph', 'orch', 'apply', 'nvmeof', poolname, 
                 '--placement', str(len(nodes)) + ';' + ';'.join(nodes)
             ])
 
-            log.info('[nvmeof]: rbd create mypool/myimage --size 8Gi')
+            log.info(f'[nvmeof]: rbd create {poolname}/{imagename} --size {self.rbd_size}')
             _shell(self.ctx, self.cluster_name, self.remote, [
-                'rbd', 'create', f'{poolname}/{imagename}', '--size', '8Gi'
+                'rbd', 'create', f'{poolname}/{imagename}', '--size', f'{self.rbd_size}'
             ])
 
         for role, i in daemons.items():
@@ -144,7 +151,8 @@ class Nvmeof(Task):
             NVMEOF_GATEWAY_NAME={gateway_name}
             NVMEOF_CLI_IMAGE="quay.io/ceph/nvmeof-cli:{self.cli_image}"
             NVMEOF_POOL={self.poolname}
-            NVMEOF_RBD_IMAGE={self.imagename}
+            NVMEOF_RBD_IMAGE={self.rbd_image_name}
+            NVMEOF_RBD_SIZE={self.rbd_size}
             NVMEOF_BDEV={self.bdev}
             NVMEOF_SERIAL={self.serial}
             NVMEOF_NQN={self.nqn}
@@ -188,6 +196,19 @@ class BasicTests(Nvmeof):
         self.test_nvmeof_connect()
         self.test_nvmeof_disconnect_all()
         self.test_nvmeof_connect_all()
+        self.test_device_size()
+
+    def test_device_size(self):
+        nvme_model = "SPDK bdev Controller"
+        _, nvme_size_bytes, _ = self._run_cmd(args=[
+            "sudo", "nvme", "list", "--output-format=json", run.Raw("|"),
+            "jq", "-r", f'.Devices | .[] | select(.ModelNumber == "{nvme_model}") | .PhysicalSize',
+        ])
+        _, rbd_image_size_bytes, _ = self._run_cmd(args=[
+            'rbd', 'info', '--format=json', run.Raw('$NVMEOF_POOL/$NVMEOF_RBD_IMAGE'), run.Raw("|"),
+            "jq", "-r", '.size',
+        ])
+        assert rbd_image_size_bytes == nvme_size_bytes, f"Expected RBD Image Size: {rbd_image_size_bytes}, nvme size: {nvme_size_bytes}"
 
     def test_nvmeof_discovery(self):
         DISCOVERY_PORT="8009"

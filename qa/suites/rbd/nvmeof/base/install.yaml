@@ -12,15 +12,16 @@ tasks:
     - ceph osd lspools
 
 - nvmeof:
-    gateway_image: v0.0.6  # "default" uses packaged version; change to test specific nvmeof images, example "latest"
-    cli_image: v0.0.6
     client: client.0
+    gateway_image: v0.0.6  # "default" uses packaged version; change to test specific nvmeof images, example "latest"
+    rbd:
+        pool_name: mypool
+        image_name: myimage
     gateway_config:
         source: host.a 
-        target: client.1
+        target: client.2
         vars:
-            pool_name: mypool
-            image_name: myimage
+            cli_image: v0.0.6
 
 - exec:
     client.0:
@@ -29,8 +30,8 @@ tasks:
 - workunit:
     no_coverage_and_limits: true
     clients:
-      client.1:
+      client.2:
         - rbd/nvmeof_initiator.sh
 
 - nvmeof.basic_tests:
-    client: client.1
+    client: client.2
