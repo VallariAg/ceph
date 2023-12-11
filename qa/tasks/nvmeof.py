@@ -7,6 +7,9 @@ from teuthology import misc as teuthology
 from teuthology.exceptions import ConfigError
 from tasks.util import get_remote_for_role
 from tasks.cephadm import _shell
+from tempfile import NamedTemporaryFile
+from teuthology.parallel import parallel
+from teuthology.packaging import install_package, remove_package
 
 log = logging.getLogger(__name__)
 
@@ -262,5 +265,116 @@ class BasicTests(Nvmeof):
         log.info(f"[nvmeof test]: test_nvmeof_connect_all successful!")
 
 
+class FIO_Test(Nvmeof):
+    """
+
+    IO Tests for NVMe-oF
+
+        - nvmeof.fio_test:
+            client.2:
+                runtime: 600
+    """
+    name = 'nvmeof.fio_test'
+
+    def setup(self): # TODO: REWRITE
+        log.info("nvmeof FIO test starting...")
+        pass
+
+    def begin(self):
+        rbd_test_dir = teuthology.get_testdir(self.ctx) + "/nvmeof_fio_test"
+        log.info("self.config")
+        log.info(self.config)
+        log.info("self.config.get('all')")
+        log.info(self.config.get('all'))
+        with parallel() as p:
+            if self.config.get('all'):
+                clients = self.ctx.cluster.only(teuthology.is_type('client'))
+                for remote,role in clients.remotes.items():
+                    p.spawn(run_fio, remote, self.config.get('all'), rbd_test_dir)
+            else:
+                for role, client_config in self.config.items():
+                    remote = list(self.ctx.cluster.only(role).remotes.keys())[0]
+                    p.spawn(run_fio, remote, client_config, rbd_test_dir)
+
+
+def _get_drive(remote):
+    log.info("getting nvme drive path..")
+    nvme_model = "SPDK bdev Controller"
+    r = remote.run(args=[
+        "sudo", "nvme", "list", "--output-format=json", run.Raw("|"),
+        "jq", "-r", f'.Devices | .[] | select(.ModelNumber == "{nvme_model}") | .DevicePath',
+    ], stdout=StringIO(), stderr=StringIO())
+    nvme_device = r.stdout.getvalue().strip()
+    log.info("nvme_device")
+    log.info(nvme_device)
+    if nvme_device:
+        return nvme_device
+
+def set_config_defaults(config, remote):
+    config['ioengine'] = config.get('ioengine', 'libaio')
+    config['bsrange'] = config.get('bsrange', '4k-64k')
+    # config['bs'] = config.get('io-engine', '4k')
+    config['numjobs'] = config.get('numjobs', '4')
+    config['size'] = config.get('size', '1G')
+    config['runtime'] = config.get('runtime', '600') # 10 mins
+    config['rw'] = config.get('rw', 'randrw')
+    config['filename'] = _get_drive(remote)
+    return config
+
+
+def write_fio_config(config, remote):
+    """ # TODO: remove
+[nvmeof-fio-test]
+fio --name=test1 --ioengine=libaio --filename /dev/nvme1n1 --rw=randrw --bsrange=4k-64k --size=1G --numjobs=4 --time_based --runtime=600 --verify=md5 --verify_fatal=1
+    """
+    fio_config=NamedTemporaryFile(mode='w', prefix='fio_nvmeof_', dir='/tmp/', delete=False)
+    fio_config.write('[nvmeof-fio-test]\n')
+    fio_config.write('ioengine={ioe}\n'.format(ioe=config['ioengine']))
+    # fio_config.write('bs={bs}\n'.format(bs=config['bs']))
+    fio_config.write('bsrange={bsrange}\n'.format(bsrange=config['bsrange']))
+    fio_config.write('numjobs={numjobs}\n'.format(numjobs=config['numjobs']))
+    fio_config.write('size={size}\n'.format(size=config['size']))
+    fio_config.write('time_based=1\n')
+    fio_config.write('runtime={runtime}\n'.format(runtime=config['runtime']))
+    fio_config.write('rw={rw}\n'.format(rw=config['rw']))
+    fio_config.write('filename={rbd_dev}\n'.format(rbd_dev=config['filename']))
+    fio_config.write('verify=md5\n')
+    fio_config.write('verify_fatal=1\n')
+    fio_config.close()
+    remote.put_file(fio_config.name,fio_config.name)
+    return fio_config
+
+def run_fio(remote, config, rbd_test_dir):
+    log.info("run_fio config:")
+    log.info(config)
+    config = set_config_defaults(config, remote)
+    log.info("run_fio config after set_config_defaults:")
+    log.info(config)
+    fio_version ='3.35'
+    host_name=remote.shortname
+    ioengine_pkg = None
+    try:
+        log.info("Running nvmeof fio test on {host_name}".format(host_name=host_name))
+        if config['ioengine'] == 'libaio':
+            system_type = teuthology.get_system_type(remote)
+            ioengine_pkg = 'libaio-devel' if system_type == 'rpm' else 'libaio-dev'
+            log.info("Installing {ioengine_pkg} on {system_type}".format(ioengine_pkg=ioengine_pkg, system_type=system_type))
+            install_package(ioengine_pkg, remote)
+        fio_config = write_fio_config(config, remote)
+
+        fio = "https://github.com/axboe/fio/archive/fio-" + fio_version + ".tar.gz"
+        remote.run(args=['mkdir', run.Raw(rbd_test_dir),])
+        remote.run(args=['cd' , run.Raw(rbd_test_dir),
+                         run.Raw(';'), 'wget', fio, run.Raw(';'), run.Raw('tar -xvf fio*tar.gz'), run.Raw(';'),
+                         run.Raw('cd fio-fio*'), run.Raw(';'), './configure', run.Raw(';'), 'make'])
+        remote.run(args=[run.Raw('{tdir}/fio-fio-{v}/fio --showcmd {f}'.format(tdir=rbd_test_dir,v=fio_version,f=fio_config.name))])
+        remote.run(args=['sudo', run.Raw('{tdir}/fio-fio-{v}/fio {f}'.format(tdir=rbd_test_dir,v=fio_version,f=fio_config.name))])
+    finally:
+        remote.run(args=['rm','-rf', run.Raw(rbd_test_dir)])
+        if ioengine_pkg:
+            remove_package(ioengine_pkg, remote)
+
+
 task = Nvmeof
 basic_tests = BasicTests
+fio_test = FIO_Test
