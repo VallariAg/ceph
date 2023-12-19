@@ -25,6 +25,7 @@ tasks:
     client: client.2
 
 - nvmeof.fio_test:
-    client.2:
-        runtime: 600
+    client: client.2
+    conf:
+        runtime: 600 #10 mins
         numjobs: 1
