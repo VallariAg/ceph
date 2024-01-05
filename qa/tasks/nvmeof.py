@@ -60,7 +60,8 @@ class Nvmeof(Task):
 
         rbd_config = self.config.get('rbd', {})
         self.poolname = rbd_config.get('pool_name', 'mypool')
-        self.rbd_image_name = rbd_config.get('image_name', 'myimage')
+        self.rbd_image_name_prefix = rbd_config.get('image_name_prefix', 'myimage')
+        self.rbd_images_count = rbd_config.get('images_count', '1')
         self.rbd_size = rbd_config.get('rbd_size', 1024*8)
 
         gateway_config = self.config.get('gateway_config', {})
@@ -103,7 +104,7 @@ class Nvmeof(Task):
                 ])
 
             poolname = self.poolname
-            imagename = self.rbd_image_name
+            images_count = self.rbd_images_count
 
             log.info(f'[nvmeof]: ceph osd pool create {poolname}')
             _shell(self.ctx, self.cluster_name, self.remote, [
@@ -121,10 +122,13 @@ class Nvmeof(Task):
                 '--placement', str(len(nodes)) + ';' + ';'.join(nodes)
             ])
 
-            log.info(f'[nvmeof]: rbd create {poolname}/{imagename} --size {self.rbd_size}')
-            _shell(self.ctx, self.cluster_name, self.remote, [
-                'rbd', 'create', f'{poolname}/{imagename}', '--size', f'{self.rbd_size}'
-            ])
+            log.info(f'[nvmeof]: creating {images_count} images')
+            for i in range(1, images_count + 1):
+                imagename = self.rbd_image_name_prefix + str(i)
+                log.info(f'[nvmeof]: rbd create {poolname}/{imagename} --size {self.rbd_size}')
+                _shell(self.ctx, self.cluster_name, self.remote, [
+                    'rbd', 'create', f'{poolname}/{imagename}', '--size', f'{self.rbd_size}'
+                ])
 
         for role, i in daemons.items():
             remote, id_ = i
@@ -141,20 +145,20 @@ class Nvmeof(Task):
     def set_gateway_cfg(self):
         log.info('[nvmeof]: running set_gateway_cfg...')
         gateway_config = self.config.get('gateway_config', {})
-        source_host = gateway_config.get('source')
         target_host = gateway_config.get('target')
-        if not (source_host and target_host):
-            raise ConfigError('gateway_config requires "source" and "target"')
-        remote = list(self.ctx.cluster.only(source_host).remotes.keys())[0]
-        ip_address = remote.ip_address
-        gateway_name = ""
+        if not (target_host):
+            raise ConfigError('gateway_config requires "target"')
+        ip_address = self.remote.ip_address
+        gateway_names = []
+        gateway_ips = []
         nvmeof_daemons = self.ctx.daemons.iter_daemons_of_role('nvmeof', cluster=self.cluster_name)
         for daemon in nvmeof_daemons:
-            if ip_address == daemon.remote.ip_address:
-                gateway_name = daemon.name()
+            gateway_names += [daemon.name()]
+            gateway_ips += [daemon.remote.ip_address]
         conf_data = dedent(f"""
-            NVMEOF_GATEWAY_IP_ADDRESS={ip_address}
-            NVMEOF_GATEWAY_NAME={gateway_name}
+            NVMEOF_GATEWAY_IP_ADDRESSES={",".join(gateway_ips)}
+            NVMEOF_GATEWAY_NAMES={",".join(gateway_names)}
+            NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS={ip_address}
             NVMEOF_CLI_IMAGE="quay.io/ceph/nvmeof-cli:{self.cli_image}"
             NVMEOF_BDEV={self.bdev}
             NVMEOF_SERIAL={self.serial}
@@ -184,20 +188,20 @@ class NvmeCommands():
 
     def run_discovery(self):
         DISCOVERY_PORT="8009"
-        log.info(f"[nvmeof]: nvme discover -t tcp -a $NVMEOF_GATEWAY_IP_ADDRESS -s {DISCOVERY_PORT}")
+        log.info(f"[nvmeof]: nvme discover -t tcp -a $NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS -s {DISCOVERY_PORT}")
         _, stdout, _ = self._run_cmd(args=[
             "sudo", "nvme", "discover", "-t", "tcp", 
-            "-a", run.Raw('$NVMEOF_GATEWAY_IP_ADDRESS'), "-s", DISCOVERY_PORT
+            "-a", run.Raw('$NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS'), "-s", DISCOVERY_PORT
         ])
         expected_discovery_stdout = "subtype: nvme subsystem"
         assert expected_discovery_stdout in stdout, f"Expected stdout: {expected_discovery_stdout}, but got: {stdout}"
         log.info("[nvmeof]: run_discovery successful!")
 
     def run_connect(self):
-        log.info("[nvmeof]: nvme connect -t tcp --traddr $NVMEOF_GATEWAY_IP_ADDRESS -s $NVMEOF_PORT -n $NVMEOF_NQN")
+        log.info("[nvmeof]: nvme connect -t tcp --traddr $NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS -s $NVMEOF_PORT -n $NVMEOF_NQN")
         self._run_cmd(args=[
             "sudo", "nvme", "connect", "-t", "tcp", 
-            "--traddr", run.Raw('$NVMEOF_GATEWAY_IP_ADDRESS'), 
+            "--traddr", run.Raw('$NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS'), 
             "-s",  run.Raw('$NVMEOF_PORT'), 
             "-n",  run.Raw('$NVMEOF_NQN')
         ])
@@ -218,9 +222,9 @@ class NvmeCommands():
         log.info("[nvmeof]: run_disconnect_all successful!")
 
     def run_connect_all(self):
-        log.info("[nvmeof]: nvme connect-all --traddr=$NVMEOF_GATEWAY_IP_ADDRESS --transport=tcp")
+        log.info("[nvmeof]: nvme connect-all --traddr=$NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS --transport=tcp")
         self._run_cmd(args=[
-            "sudo", "nvme", "connect-all", run.Raw('--traddr=$NVMEOF_GATEWAY_IP_ADDRESS'), "--transport=tcp", 
+            "sudo", "nvme", "connect-all", run.Raw('--traddr=$NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS'), "--transport=tcp", 
         ])
         _, stdout, _ = self._run_cmd(args=["sudo", "nvme", "list"])
         expected_connect_stdout = SPDK_CONTROLLER
@@ -274,21 +278,27 @@ class BasicTests(Nvmeof):
 
     def test_device_size(self, cmd):
         env = self.config.get('env', {})
-        if ("RBD_POOL" not in env) or ("RBD_IMAGE" not in env):
-            log.info("[nvmeof]: skipping device size test - pool name and image unkown!")
+        if ("RBD_POOL" not in env):
+            log.info("[nvmeof]: skipping device size test - pool name unkown!")
             return
-        pool, image = env["RBD_POOL"], env["RBD_IMAGE"]
+        pool = env["RBD_POOL"]
         log.info("[nvmeof]: testing device size")
         nvme_model = SPDK_CONTROLLER
         _, nvme_size_bytes, _ = cmd._run_cmd(args=[
             "sudo", "nvme", "list", "--output-format=json", run.Raw("|"),
             "jq", "-r", f'.Devices | .[] | select(.ModelNumber == "{nvme_model}") | .PhysicalSize',
         ])
-        _, rbd_image_size_bytes, _ = cmd._run_cmd(args=[
-            'rbd', 'info', '--format=json', f'{pool}/{image}', run.Raw("|"),
-            "jq", "-r", '.size',
+        nvme_device_count = len(nvme_size_bytes.split())
+        nvme_total_size = sum([int(dsize) for dsize in nvme_size_bytes.split()])
+        _, rbd_pool_stats_, _ = cmd._run_cmd(args=[
+            'rbd', 'pool', 'stats', f'{pool}',
+            "--pretty-format", "--format", 'json',
         ])
-        assert rbd_image_size_bytes == nvme_size_bytes, f"Expected RBD Image Size: {rbd_image_size_bytes}, nvme size: {nvme_size_bytes}"
+        rbd_pool_stats = json.loads(rbd_pool_stats_)
+        rbd_img_count = rbd_pool_stats["images"]["count"]
+        rbd_total_size = rbd_pool_stats["images"]["provisioned_bytes"]
+        assert nvme_device_count == rbd_img_count, f"RBD image count: {rbd_img_count}, nvme device count: {nvme_device_count}"
+        assert nvme_total_size == rbd_total_size, f"RBD total size: {rbd_total_size}, nvme size: {nvme_total_size}"
         log.info("[nvmeof]: test_device_size successful!")
 
 
@@ -311,16 +321,16 @@ class FIO_Test(Nvmeof):
         self.run_fio(self.config.get('conf'))
         cmd.run_disconnect_all()
 
-    def _get_device_path(self):
+    def _get_device_paths(self):
         log.info("[nvmeof]: getting drive path..")
         nvme_model = SPDK_CONTROLLER
         r = self.remote.run(args=[
             "sudo", "nvme", "list", "--output-format=json", run.Raw("|"),
             "jq", "-r", f'.Devices | .[] | select(.ModelNumber == "{nvme_model}") | .DevicePath',
         ], stdout=StringIO(), stderr=StringIO())
-        nvme_device = r.stdout.getvalue().strip()
-        if nvme_device:
-            return nvme_device
+        nvme_devices = r.stdout.getvalue().strip().split()
+        if nvme_devices:
+            return nvme_devices
 
     def _set_config_defaults(self, config):
         config['ioengine'] = config.get('ioengine', 'sync')
@@ -329,7 +339,7 @@ class FIO_Test(Nvmeof):
         config['size'] = config.get('size', '1G')
         config['runtime'] = config.get('runtime', '600') # 10 mins
         config['rw'] = config.get('rw', 'randrw')
-        config['drive'] = self._get_device_path()
+        config['drives'] = self._get_device_paths()
         return config
 
     def write_fio_config(self, config):
@@ -347,7 +357,7 @@ class FIO_Test(Nvmeof):
         fio_config.write('time_based=1\n')
         fio_config.write('runtime={runtime}\n'.format(runtime=config['runtime']))
         fio_config.write('rw={rw}\n'.format(rw=config['rw']))
-        fio_config.write('filename={nvme_device}\n'.format(nvme_device=config['drive']))
+        fio_config.write('filename={nvme_devices}\n'.format(nvme_devices=":".join(config['drives'])))
         fio_config.write('verify=md5\n')
         fio_config.write('verify_fatal=1\n')
         fio_config.close()
@@ -371,7 +381,7 @@ class FIO_Test(Nvmeof):
             if self.config.get('iostat_interval'):
                 iostat_interval = self.config.get('iostat_interval')
                 iostat_count = int(config['runtime']) // int(iostat_interval) + 10
-                iostat_cmd = ['sudo', 'iostat', '-d', '-p', config['drive'], str(iostat_interval), str(iostat_count), '-h']
+                iostat_cmd = ['sudo', 'iostat', '-d', '-p'] + config['drives'] + [str(iostat_interval), str(iostat_count), '-h']
                 install_package("sysstat", self.remote)
                 log.info("[nvmeof]: Running fio test and iostat in parallel..")
                 with futures.ThreadPoolExecutor(max_workers=2) as executor:
