@@ -13,13 +13,13 @@ RBD_POOL="${RBD_POOL:-mypool}"
 RBD_IMAGE="${RBD_IMAGE:-myimage}"
 
 HOSTNAME=$(hostname)
-sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT create_bdev --pool $RBD_POOL --image $RBD_IMAGE --bdev $NVMEOF_BDEV
 sudo podman images
 sudo podman ps
-sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT create_subsystem --subnqn $NVMEOF_NQN --serial $NVMEOF_SERIAL
-sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT add_namespace --subnqn $NVMEOF_NQN --bdev $NVMEOF_BDEV
-sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT create_listener -n $NVMEOF_NQN -g client.$NVMEOF_GATEWAY_NAME -a $NVMEOF_GATEWAY_IP_ADDRESS -s $NVMEOF_PORT
-sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT add_host --subnqn $NVMEOF_NQN --host "*"
-sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT get_subsystems
+sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT subsystem list
+sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT subsystem add --subsystem $NVMEOF_NQN
+sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT namespace add --subsystem $NVMEOF_NQN --rbd-pool $RBD_POOL --rbd-image $RBD_IMAGE
+sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT listener add --subsystem $NVMEOF_NQN --gateway-name client.$NVMEOF_GATEWAY_NAME --traddr $NVMEOF_GATEWAY_IP_ADDRESS --trsvcid $NVMEOF_PORT
+sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT host add --subsystem $NVMEOF_NQN --host "*"
+sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT subsystem list
 sudo lsmod | grep nvme
 sudo nvme list
