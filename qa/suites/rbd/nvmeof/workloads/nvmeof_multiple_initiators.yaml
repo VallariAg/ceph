@@ -1,0 +1,52 @@
+roles:
+
+tasks:
+- nvmeof: # deploy gateways
+    client: client.0
+    version: v0.0.7  # "default" uses packaged version; change to test specific nvmeof images, example "latest"
+    rbd:
+        pool_name: mypool
+        images_count: 5
+    gateway_config:
+        target: client.2
+        vars:
+            cli_version: v0.0.7
+
+- cephadm.wait_for_service:
+    service: nvmeof.mypool
+
+- exec:
+    client.0:
+      - journalctl -u $(systemctl list-units | grep nvmeof.a | awk '{print $1}')
+
+- workunit: # configure gateways
+    no_coverage_and_limits: true
+    clients:
+      client.2:
+        - rbd/nvmeof_initiator.sh
+    env:
+      RBD_POOL: mypool
+
+- nvmeof.basic_tests:
+    client: client.2
+    env:
+      RBD_POOL: mypool
+
+- nvmeof.fio_test:
+    client: client.2
+    iostat_interval: 10 #sec
+    conf:
+        runtime: 600 #10 mins
+        numjobs: 1
+
+- nvmeof.basic_tests:
+    client: client.3
+    env:
+      RBD_POOL: mypool
+
+- nvmeof.fio_test:
+    client: client.3
+    iostat_interval: 10 #sec
+    conf:
+        runtime: 600 #10 mins
+        numjobs: 1
