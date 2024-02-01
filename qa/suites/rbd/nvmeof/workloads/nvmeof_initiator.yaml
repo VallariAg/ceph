@@ -4,7 +4,7 @@ tasks:
     version: v0.0.7  # "default" uses packaged version; change to test specific nvmeof images, example "latest"
     rbd:
         pool_name: mypool
-        images_count: 5
+        images_count: 64
     gateway_config:
         target: client.2
         vars:
