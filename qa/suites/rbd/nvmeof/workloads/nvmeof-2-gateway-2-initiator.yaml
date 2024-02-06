@@ -14,6 +14,7 @@ roles:
   - client.1
   - ceph.nvmeof.nvmeof.b
 - - client.2
+- - client.3
 
 tasks:
 - nvmeof:
@@ -34,7 +35,21 @@ tasks:
       client.2:
         - rbd/nvmeof_initiator.sh
         - rbd/nvmeof_basic_tests.sh
-        - rbd/nvmeof_fio_test.sh
     env:
       RBD_POOL: mypool
+
+- workunit:
+    no_coverage_and_limits: true
+    clients:
+      client.3:
+        - rbd/nvmeof_basic_tests.sh
+
+- workunit:
+    no_coverage_and_limits: true
+    clients:
+      client.2:
+        - rbd/nvmeof_fio_test.sh 1 5
+      client.3:
+        - rbd/nvmeof_fio_test.sh 6 10
+    env:
       IOSTAT_INTERVAL: '10'
