@@ -1,7 +1,7 @@
 tasks:
 - nvmeof:
     client: client.0
-    version: latest  # "default" uses packaged version; change to test specific nvmeof images, example "latest"
+    version: v0.0.7  # "default" uses packaged version; change to test specific nvmeof images, example "latest"
     rbd:
         pool_name: mypool
         images_count: 5
@@ -9,7 +9,7 @@ tasks:
         source: host.a 
         target: client.2
         vars:
-            cli_version: latest
+            cli_version: v0.0.7
 
 - cephadm.wait_for_service:
     service: nvmeof.mypool
@@ -20,7 +20,39 @@ tasks:
       client.2:
         - rbd/nvmeof_initiator.sh
         - rbd/nvmeof_basic_tests.sh
-        - rbd/nvmeof_fio_test.sh
+        # - rbd/nvmeof_fio_test.sh
     env:
       RBD_POOL: mypool
       IOSTAT_INTERVAL: '10'
+
+- parallel:
+  - fio
+  - restart-gateways
+
+
+restart-gateways:
+  sequential:
+  # stop gateway 1 and restart it
+  - sleep:
+      duration: 120 
+  - nvmeof.stop: [nvmeof.a]
+  - sleep:
+      duration: 120 
+  - nvmeof.start: [nvmeof.a]
+  # stop gateway 2 and restart it
+  - sleep:
+      duration: 120
+  - nvmeof.stop: [nvmeof.b]
+  - sleep:
+      duration: 120
+  - nvmeof.start: [nvmeof.b]
+
+fio:
+  sequential:
+  - workunit:
+      clients:
+        client.2:
+          - rbd/nvmeof_fio_test.sh
+      env:
+        IOSTAT_INTERVAL: '10'
+        RUNTIME: '600' # 10 mins

@@ -39,7 +39,7 @@ connect_all() {
 list_subsys() {
     expected_count=$1
     output=$(sudo nvme list-subsys --output-format=json)
-    multipath=$(echo $output | grep -c '"tcp"')
+    multipath=$(echo $output | grep -o '"tcp"' | wc -l)
     if [ "$multipath" -ne "$expected_count" ]; then
         return 1
     fi

@@ -169,4 +169,46 @@ class Nvmeof(Task):
         log.info("[nvmeof]: executed set_gateway_cfg successfully!")
 
 
+class Start(Nvmeof):
+    def __init__(self, ctx, config):
+        if isinstance(config, list):
+            config = {'daemons': config}
+        super(Nvmeof, self).__init__(ctx, config)
+
+    def setup(self):
+        pass
+        
+    def begin(self):
+        conf = self.config.get('daemons')
+        if conf == ['all']:
+            nvmeof_daemons = self.ctx.daemons.iter_daemons_of_role('nvmeof', cluster=self.cluster_name)
+            for daemon in nvmeof_daemons:
+                daemon.start()
+        else:
+            for daemon_id in conf:
+                self.ctx.daemons.get_daemon('nvmeof', daemon_id, self.cluster_name).start()
+
+
+class Stop(Nvmeof):
+    def __init__(self, ctx, config):
+        if isinstance(config, list):
+            config = {'daemons': config}
+        super(Nvmeof, self).__init__(ctx, config)
+
+    def setup(self):
+        pass
+        
+    def begin(self):
+        conf = self.config.get('daemons')
+        if conf == ['all']:
+            nvmeof_daemons = self.ctx.daemons.iter_daemons_of_role('nvmeof', cluster=self.cluster_name)
+            for daemon in nvmeof_daemons:
+                daemon.stop()
+        else:
+            for daemon_id in conf:
+                self.ctx.daemons.get_daemon('nvmeof', daemon_id, self.cluster_name).stop()
+
+
 task = Nvmeof
+start = Start
+stop = Stop

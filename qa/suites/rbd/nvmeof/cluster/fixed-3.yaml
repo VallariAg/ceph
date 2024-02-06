@@ -12,5 +12,5 @@ roles:
   - osd.3
   - osd.4
   - client.1
-  - ceph.nvmeof.nvmeof.a
+  - ceph.nvmeof.nvmeof.b
 - - client.2
