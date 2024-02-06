@@ -5,7 +5,7 @@ SPDK_CONTROLLER="SPDK bdev Controller"
 DISCOVERY_PORT="8009"
 
 discovery() {
-    output=$(sudo nvme discover -t tcp -a $NVMEOF_GATEWAY_IP_ADDRESS -s $DISCOVERY_PORT)
+    output=$(sudo nvme discover -t tcp -a $NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS -s $DISCOVERY_PORT)
     expected_discovery_stdout="subtype: nvme subsystem"
     if ! echo "$output" | grep -q "$expected_discovery_stdout"; then
         return 1
@@ -13,7 +13,7 @@ discovery() {
 }
 
 connect() {
-    sudo nvme connect -t tcp --traddr $NVMEOF_GATEWAY_IP_ADDRESS -s $NVMEOF_PORT -n $NVMEOF_NQN
+    sudo nvme connect -t tcp --traddr $NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS -s $NVMEOF_PORT -n $NVMEOF_NQN
     output=$(sudo nvme list)
     if ! echo "$output" | grep -q "$SPDK_CONTROLLER"; then
         return 1
@@ -29,7 +29,7 @@ disconnect_all() {
 }
 
 connect_all() {
-    sudo nvme connect-all --traddr=$NVMEOF_GATEWAY_IP_ADDRESS --transport=tcp
+    sudo nvme connect-all --traddr=$NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS --transport=tcp
     output=$(sudo nvme list)
     if ! echo "$output" | grep -q "$SPDK_CONTROLLER"; then
         return 1
@@ -65,7 +65,8 @@ test_run list_subsys 1
 test_run disconnect_all
 test_run list_subsys 0
 test_run connect_all
-test_run list_subsys 1
+gateway_count=$(echo "$NVMEOF_GATEWAY_IP_ADDRESSES" | tr -cd ',' | wc -c)
+test_run list_subsys $((gateway_count + 1))
 
 
 echo "-------------Test Summary-------------"

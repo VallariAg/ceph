@@ -54,7 +54,7 @@ class Nvmeof(Task):
 
         rbd_config = self.config.get('rbd', {})
         self.poolname = rbd_config.get('pool_name', 'mypool')
-        self.rbd_image_name = rbd_config.get('image_name', 'myimage')
+        self.rbd_images_count = rbd_config.get('images_count', '1')
         self.rbd_size = rbd_config.get('rbd_size', 1024*8)
 
         gateway_config = self.config.get('gateway_config', {})
@@ -97,7 +97,7 @@ class Nvmeof(Task):
                 ])
 
             poolname = self.poolname
-            imagename = self.rbd_image_name
+            images_count = self.rbd_images_count
 
             log.info(f'[nvmeof]: ceph osd pool create {poolname}')
             _shell(self.ctx, self.cluster_name, self.remote, [
@@ -115,10 +115,13 @@ class Nvmeof(Task):
                 '--placement', str(len(nodes)) + ';' + ';'.join(nodes)
             ])
 
-            log.info(f'[nvmeof]: rbd create {poolname}/{imagename} --size {self.rbd_size}')
-            _shell(self.ctx, self.cluster_name, self.remote, [
-                'rbd', 'create', f'{poolname}/{imagename}', '--size', f'{self.rbd_size}'
-            ])
+            log.info(f'[nvmeof]: creating {images_count} images')
+            for i in range(1, images_count + 1):
+                imagename = "image" + str(i)
+                log.info(f'[nvmeof]: rbd create {poolname}/{imagename} --size {self.rbd_size}')
+                _shell(self.ctx, self.cluster_name, self.remote, [
+                    'rbd', 'create', f'{poolname}/{imagename}', '--size', f'{self.rbd_size}'
+                ])
 
         for role, i in daemons.items():
             remote, id_ = i
@@ -135,21 +138,22 @@ class Nvmeof(Task):
     def set_gateway_cfg(self):
         log.info('[nvmeof]: running set_gateway_cfg...')
         gateway_config = self.config.get('gateway_config', {})
-        source_host = gateway_config.get('source')
         target_host = gateway_config.get('target')
-        if not (source_host and target_host):
-            raise ConfigError('gateway_config requires "source" and "target"')
-        remote = list(self.ctx.cluster.only(source_host).remotes.keys())[0]
-        ip_address = remote.ip_address
-        gateway_name = ""
+        if not (target_host):
+            raise ConfigError('gateway_config requires "target"')
+        ip_address = self.remote.ip_address
+        gateway_names = []
+        gateway_ips = []
         nvmeof_daemons = self.ctx.daemons.iter_daemons_of_role('nvmeof', cluster=self.cluster_name)
         for daemon in nvmeof_daemons:
-            if ip_address == daemon.remote.ip_address:
-                gateway_name = daemon.name()
+            gateway_names += [daemon.name()]
+            gateway_ips += [daemon.remote.ip_address]
         conf_data = dedent(f"""
-            NVMEOF_GATEWAY_IP_ADDRESS={ip_address}
-            NVMEOF_GATEWAY_NAME={gateway_name}
+            NVMEOF_GATEWAY_IP_ADDRESSES={",".join(gateway_ips)}
+            NVMEOF_GATEWAY_NAMES={",".join(gateway_names)}
+            NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS={ip_address}
             NVMEOF_CLI_IMAGE="quay.io/ceph/nvmeof-cli:{self.cli_image}"
+            NVMEOF_NAMESPACES={self.rbd_images_count}
             NVMEOF_BDEV={self.bdev}
             NVMEOF_SERIAL={self.serial}
             NVMEOF_NQN={self.nqn}

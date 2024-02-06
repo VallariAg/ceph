@@ -4,7 +4,7 @@ tasks:
     version: latest  # "default" uses packaged version; change to test specific nvmeof images, example "latest"
     rbd:
         pool_name: mypool
-        image_name: myimage
+        images_count: 5
     gateway_config:
         source: host.a 
         target: client.2
@@ -23,5 +23,4 @@ tasks:
         - rbd/nvmeof_fio_test.sh
     env:
       RBD_POOL: mypool
-      RBD_IMAGE: myimage
       IOSTAT_INTERVAL: '10'
