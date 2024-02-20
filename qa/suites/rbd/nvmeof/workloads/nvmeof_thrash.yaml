@@ -13,8 +13,14 @@ roles:
   - osd.4
   - client.1
   - ceph.nvmeof.nvmeof.b
-- - client.2
-- - client.3
+- - host.c
+  - mon.c
+  - osd.5
+  - osd.6
+  - osd.7
+  - client.2
+  - ceph.nvmeof.nvmeof.c
+- - client.3 # initiator
 
 tasks:
 - nvmeof:
@@ -24,7 +30,7 @@ tasks:
       pool_name: mypool
       image_name_prefix: myimage
     gateway_config:
-      namespaces_count: 128
+      namespaces_count: 10
       cli_version: latest
 
 - cephadm.wait_for_service:
@@ -33,23 +39,14 @@ tasks:
 - workunit:
     no_coverage_and_limits: true
     clients:
-      client.2:
+      client.3:
         - rbd/nvmeof_setup_subsystem.sh
+        - rbd/nvmeof_basic_tests.sh
+        - rbd/nvmeof_fio_test.sh --rbd_iostat
     env:
       RBD_POOL: mypool
       RBD_IMAGE_PREFIX: myimage
-
-- workunit:
-    no_coverage_and_limits: true
-    timeout: 30m
-    clients:
-      client.2:
-        - rbd/nvmeof_basic_tests.sh
-        - rbd/nvmeof_fio_test.sh --start_ns 1 --end_ns 64 --rbd_iostat
-      client.3:
-        - rbd/nvmeof_basic_tests.sh
-        - rbd/nvmeof_fio_test.sh --start_ns 65 --end_ns 128
-    env:
-      RBD_POOL: mypool
       IOSTAT_INTERVAL: '10'
       RUNTIME: '600'
+
+- nvmeof.thrash:
