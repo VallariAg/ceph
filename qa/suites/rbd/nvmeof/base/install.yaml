@@ -1,6 +1,5 @@
 use_shaman: True
 tasks:
-- install:
 - cephadm:
 - cephadm.shell:
     host.a:
