@@ -24,7 +24,8 @@ tasks:
       pool_name: mypool
       image_name_prefix: myimage
     gateway_config:
-      namespaces_count: 128
+      subsystems_count: 3
+      namespaces_count: 20
       cli_version: latest
 
 - cephadm.wait_for_service:
@@ -45,10 +46,10 @@ tasks:
     clients:
       client.2:
         - rbd/nvmeof_basic_tests.sh
-        - rbd/nvmeof_fio_test.sh --start 1 --end 64 --rbd_iostat
+        - rbd/nvmeof_fio_test.sh --start 1 --end 30 --rbd_iostat
       client.3:
         - rbd/nvmeof_basic_tests.sh
-        - rbd/nvmeof_fio_test.sh --start 65 --end 128
+        - rbd/nvmeof_fio_test.sh --start 31 --end 60
     env:
       IOSTAT_INTERVAL: '10'
       RUNTIME: '600'
