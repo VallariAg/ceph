@@ -31,7 +31,7 @@ tasks:
       image_name_prefix: myimage
     gateway_config:
       namespaces_count: 10
-      cli_version: latest
+      cli_version: 1.0.0
 
 - cephadm.wait_for_service:
     service: nvmeof.mypool

@@ -34,7 +34,7 @@ disconnect_all() {
 }
 
 connect_all() {
-    sudo nvme connect-all --traddr=$NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS --transport=tcp
+    sudo nvme connect-all -t tcp --traddr $NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS -l 1800
     output=$(sudo nvme list)
     if ! echo "$output" | grep -q "$SPDK_CONTROLLER"; then
         return 1
@@ -72,7 +72,7 @@ test_run list_subsys 0
 test_run connect_all
 multipath_count=$(( ($(echo "$NVMEOF_GATEWAY_IP_ADDRESSES" | tr -cd ',' | wc -c) + 1)*$NVMEOF_SUBSYSTEMS_COUNT)) 
 test_run list_subsys $multipath_count
-
+dmesg | tail -n 30
 
 echo "-------------Test Summary-------------"
 echo "[nvmeof] All nvmeof basic tests passed!"
