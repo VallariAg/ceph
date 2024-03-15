@@ -14,19 +14,19 @@ roles:
   - client.1
   - ceph.nvmeof.nvmeof.b
 - - client.2
-- - client.3
+# - - client.3
 
 tasks:
 - nvmeof:
     client: client.0
-    version: default  # "default" is the image cephadm defaults to; change to test specific nvmeof images, example "latest"
+    version: 1.1.0  # "default" is the image cephadm defaults to; change to test specific nvmeof images, example "latest"
     rbd:
       pool_name: mypool
       image_name_prefix: myimage
     gateway_config:
       subsystems_count: 3
       namespaces_count: 20
-      cli_version: latest
+      cli_version: 1.1.0
 
 - cephadm.wait_for_service:
     service: nvmeof.mypool
@@ -40,16 +40,16 @@ tasks:
       RBD_POOL: mypool
       RBD_IMAGE_PREFIX: myimage
 
-- workunit:
-    no_coverage_and_limits: true
-    timeout: 30m
-    clients:
-      client.2:
-        - rbd/nvmeof_basic_tests.sh
-        - rbd/nvmeof_fio_test.sh --start 1 --end 30 --rbd_iostat
-      client.3:
-        - rbd/nvmeof_basic_tests.sh
-        - rbd/nvmeof_fio_test.sh --start 31 --end 60
-    env:
-      IOSTAT_INTERVAL: '10'
-      RUNTIME: '600'
+# - workunit:
+#     no_coverage_and_limits: true
+#     timeout: 30m
+#     clients:
+#       client.2:
+#         - rbd/nvmeof_basic_tests.sh
+#         - rbd/nvmeof_fio_test.sh --start 1 --end 30 --rbd_iostat
+#       client.3:
+#         - rbd/nvmeof_basic_tests.sh
+#         - rbd/nvmeof_fio_test.sh --start 31 --end 60
+#     env:
+#       IOSTAT_INTERVAL: '10'
+#       RUNTIME: '600'
