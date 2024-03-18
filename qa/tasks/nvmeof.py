@@ -63,11 +63,12 @@ class Nvmeof(Task):
         self.rbd_size = rbd_config.get('rbd_size', 1024*8)
 
         gateway_config = self.config.get('gateway_config', {})
+        self.nqn_prefix = gateway_config.get('subsystem_nqn_prefix', 'nqn.2016-06.io.spdk:cnode')
+        self.subsystems_count = gateway_config.get('subsystems_count', 1) 
         self.namespaces_count = gateway_config.get('namespaces_count', 1)
         self.cli_image = gateway_config.get('cli_version', 'latest')
         self.bdev = gateway_config.get('bdev', 'mybdev')
         self.serial = gateway_config.get('serial', 'SPDK00000000000001')
-        self.nqn = gateway_config.get('nqn', 'nqn.2016-06.io.spdk:cnode1')
         self.port = gateway_config.get('port', '4420')
         self.srport = gateway_config.get('srport', '5500')
 
@@ -119,8 +120,9 @@ class Nvmeof(Task):
                 '--placement', str(len(nodes)) + ';' + ';'.join(nodes)
             ])
 
+            total_images = int(self.namespaces_count) * int(self.subsystems_count)
             log.info(f'[nvmeof]: creating {self.namespaces_count} images')
-            for i in range(1, int(self.namespaces_count) + 1):
+            for i in range(1, total_images + 1):
                 imagename = self.image_name_prefix + str(i)
                 log.info(f'[nvmeof]: rbd create {poolname}/{imagename} --size {self.rbd_size}')
                 _shell(self.ctx, self.cluster_name, self.remote, [
@@ -153,8 +155,9 @@ class Nvmeof(Task):
             NVMEOF_GATEWAY_NAMES={",".join(gateway_names)}
             NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS={ip_address}
             NVMEOF_CLI_IMAGE="quay.io/ceph/nvmeof-cli:{self.cli_image}"
+            NVMEOF_SUBSYSTEMS_PREFIX={self.nqn_prefix}
+            NVMEOF_SUBSYSTEMS_COUNT={self.subsystems_count}
             NVMEOF_NAMESPACES_COUNT={self.namespaces_count}
-            NVMEOF_NQN={self.nqn}
             NVMEOF_PORT={self.port}
             NVMEOF_SRPORT={self.srport}
             """)
