@@ -17,35 +17,59 @@ sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_DEFAULT_GATEWAY_I
 IFS=',' read -ra gateway_ips <<< "$NVMEOF_GATEWAY_IP_ADDRESSES"
 IFS=',' read -ra gateway_names <<< "$NVMEOF_GATEWAY_NAMES"
 
+list_subsystems () { 
+   for i in "${!gateway_ips[@]}"
+    do
+        ip="${gateway_ips[i]}"
+        sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $ip --server-port $NVMEOF_SRPORT --format json subsystem list
+    done
+}
+
+list_subsystems
+
 # add all subsystems
+for i in $(seq 1 $NVMEOF_SUBSYSTEMS_COUNT); do
+    subsystem_nqn="${NVMEOF_SUBSYSTEMS_PREFIX}${i}"
+    sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT subsystem add --subsystem $subsystem_nqn
+done
+
+list_subsystems
+
+# add all gateway listeners 
+for i in "${!gateway_ips[@]}"
+do
+    ip="${gateway_ips[i]}"
+    name="${gateway_names[i]}"
+    for j in $(seq 1 $NVMEOF_SUBSYSTEMS_COUNT); do
+        subsystem_nqn="${NVMEOF_SUBSYSTEMS_PREFIX}${j}"
+        echo "Adding gateway listener $index with IP ${ip} and name ${name}"
+        sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $ip --server-port $NVMEOF_SRPORT listener add --subsystem $subsystem_nqn --gateway-name client.$name --traddr $ip --trsvcid $NVMEOF_PORT
+    done
+done
+
+# add all hosts
+for i in $(seq 1 $NVMEOF_SUBSYSTEMS_COUNT); do
+    subsystem_nqn="${NVMEOF_SUBSYSTEMS_PREFIX}${i}"
+    sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT host add --subsystem $subsystem_nqn --host "*"
+done
+
+# add all namespaces
 image_index=1
 for i in $(seq 1 $NVMEOF_SUBSYSTEMS_COUNT); do
     subsystem_nqn="${NVMEOF_SUBSYSTEMS_PREFIX}${i}"
-    sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT subsystem add --subsystem $subsystem_nqn --enable-ha
-
-    # add all namespaces
     for ns in $(seq 1 $NVMEOF_NAMESPACES_COUNT); do
         image="${RBD_IMAGE_PREFIX}${image_index}"
         sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT namespace add --subsystem $subsystem_nqn --rbd-pool $RBD_POOL --rbd-image $image
         ((image_index++))
     done
-    # add all gateway listeners
-    for i in "${!gateway_ips[@]}"
-    do
-        ip="${gateway_ips[i]}"
-        name="${gateway_names[i]}"
-        echo "Adding gateway listener $index with IP ${ip} and name ${name}"
-        sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $ip --server-port $NVMEOF_SRPORT listener add --subsystem $subsystem_nqn --gateway-name client.$name --traddr $ip --trsvcid $NVMEOF_PORT
-    done
-
-    sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT host add --subsystem $subsystem_nqn --host "*"
 done
 
-# list subsystem
-for i in "${!gateway_ips[@]}"
-do
-    ip="${gateway_ips[i]}"
-    sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $ip --server-port $NVMEOF_SRPORT --format json subsystem list
+list_subsystems
+
+# list namespaces
+for i in $(seq 1 $NVMEOF_SUBSYSTEMS_COUNT); do
+    subsystem_nqn="${NVMEOF_SUBSYSTEMS_PREFIX}${i}"
+    sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS --server-port $NVMEOF_SRPORT --format plain namespace list --subsystem $subsystem_nqn        
 done
 
 

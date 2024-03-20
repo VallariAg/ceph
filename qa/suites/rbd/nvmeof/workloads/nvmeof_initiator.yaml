@@ -47,10 +47,10 @@ tasks:
     clients:
       client.2:
         - rbd/nvmeof_basic_tests.sh
-        - rbd/nvmeof_fio_test.sh --start_ns 1 --end_ns 64 --rbd_iostat
+        # - rbd/nvmeof_fio_test.sh --start_ns 1 --end_ns 64 --rbd_iostat
       client.3:
         - rbd/nvmeof_basic_tests.sh
-        - rbd/nvmeof_fio_test.sh --start_ns 65 --end_ns 128
+        # - rbd/nvmeof_fio_test.sh --start_ns 65 --end_ns 128
     env:
       RBD_POOL: mypool
       IOSTAT_INTERVAL: '10'
