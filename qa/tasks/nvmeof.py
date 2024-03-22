@@ -172,6 +172,7 @@ class Nvmeof(Task):
 
 class NvmeofThrasher(Thrasher, Greenlet):
     def __init__(self, config, daemons) -> None:
+        super(NvmeofThrasher, self).__init__()
 
         if config is None:
             self.config = dict()
@@ -190,10 +191,10 @@ class NvmeofThrasher(Thrasher, Greenlet):
 
         """ Thrashing params """
         self.randomize = bool(self.config.get('randomize', True))
-        self.min_thrash_delay = float(self.config.get('min_thrash_delay', 60.0))
-        self.max_thrash_delay = float(self.config.get('max_thrash_delay', self.min_thrash_delay + 30.0))
-        self.min_revive_delay = float(self.config.get('min_revive_delay', 0.0))
-        self.max_revive_delay = float(self.config.get('max_revive_delay', self.min_revive_delay + 10.0))
+        self.min_thrash_delay = int(self.config.get('min_thrash_delay', 60))
+        self.max_thrash_delay = int(self.config.get('max_thrash_delay', self.min_thrash_delay + 30))
+        self.min_revive_delay = int(self.config.get('min_revive_delay', 0))
+        self.max_revive_delay = int(self.config.get('max_revive_delay', self.min_revive_delay + 10))
         # self.daemons = list(self.ctx.daemons.iter_daemons_of_role('nvmeof', cluster=self.cluster_name))
         # self.thread = gevent.spawn(self.do_thrash)
 
@@ -254,34 +255,60 @@ class NvmeofThrasher(Thrasher, Greenlet):
             for daemon in dameons_to_kill:
                 self.log('reviving {label}'.format(label=daemon.id_))
                 daemon.start()
-                
 
-@contextlib.contextmanager
-def thrash(ctx, config):
-    if config is None:
-        config = {}
-    assert isinstance(config, dict), \
-        'nvmeof.thrash task only accepts a dict for configuration'
+class ThrashTest(Nvmeof):
+    name = 'nvmeof.thrash'
+    def setup(self):
+        if self.config is None:
+            self.config = {}
+        assert isinstance(self.config, dict), \
+            'nvmeof.thrash task only accepts a dict for configuration'
 
-    cluster = config.get('cluster', 'ceph')
-    daemons = list(ctx.daemons.iter_daemons_of_role('nvmeof', cluster))
-    assert len(daemons) > 1, \
-        'nvmeof.thrash task requires at least 2 nvmeof daemon'
+        self.cluster = self.config.get('cluster', 'ceph')
+        daemons = list(self.ctx.daemons.iter_daemons_of_role('nvmeof', self.cluster))
+        assert len(daemons) > 1, \
+            'nvmeof.thrash task requires at least 2 nvmeof daemon'
 
-    thrasher = NvmeofThrasher(config, daemons)
-    thrasher.start()
-    ctx.ceph[cluster].thrashers.append(thrasher)
+        self.thrasher = NvmeofThrasher(self.config, daemons)
+    
+    def begin(self):
+        self.thrasher.start()
+        self.ctx.ceph[self.cluster].thrashers.append(self.thrasher) 
 
-    try:
-        log.debug('Yielding')
-        yield
-    finally:
+    def end(self):
         log.info('joining nvmeof.thrash')
-        thrasher.stop()
-        if thrasher.exception is not None:
+        self.thrasher.stop()
+        if self.thrasher.exception is not None:
             raise RuntimeError('error during thrashing')
-        thrasher.join()
+        self.thrasher.join()
         log.info('done joining')
 
+# @contextlib.contextmanager
+# def thrash(ctx, config):
+#     if config is None:
+#         config = {}
+#     assert isinstance(config, dict), \
+#         'nvmeof.thrash task only accepts a dict for configuration'
+
+#     cluster = config.get('cluster', 'ceph')
+#     daemons = list(ctx.daemons.iter_daemons_of_role('nvmeof', cluster))
+#     assert len(daemons) > 1, \
+#         'nvmeof.thrash task requires at least 2 nvmeof daemon'
+
+#     thrasher = NvmeofThrasher(config, daemons)
+#     thrasher.start()
+#     ctx.ceph[cluster].thrashers.append(thrasher)
+
+#     try:
+#         log.debug('Yielding')
+#         yield
+#     finally:
+#         log.info('joining nvmeof.thrash')
+#         thrasher.stop()
+#         if thrasher.exception is not None:
+#             raise RuntimeError('error during thrashing')
+#         thrasher.join()
+#         log.info('done joining')
 
 task = Nvmeof
+thrash = ThrashTest
