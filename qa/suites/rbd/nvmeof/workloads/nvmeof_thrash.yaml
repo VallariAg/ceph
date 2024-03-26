@@ -48,6 +48,7 @@ tasks:
       RBD_IMAGE_PREFIX: myimage
 
 - nvmeof.thrash:
+    initiator: client.3
 
 - workunit:
     no_coverage_and_limits: true

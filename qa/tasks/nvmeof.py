@@ -171,13 +171,14 @@ class Nvmeof(Task):
 
 
 class NvmeofThrasher(Thrasher, Greenlet):
-    def __init__(self, config, daemons) -> None:
+    def __init__(self, config, daemons, remote) -> None:
         super(NvmeofThrasher, self).__init__()
 
         if config is None:
             self.config = dict()
         self.config = config
         self.daemons = daemons
+        self.remote = remote
         self.logger = log.getChild('[nvmeof.thrasher]')
         self.stopping = Event()
 
@@ -197,6 +198,9 @@ class NvmeofThrasher(Thrasher, Greenlet):
         self.max_revive_delay = int(self.config.get('max_revive_delay', self.min_revive_delay + 10))
         # self.daemons = list(self.ctx.daemons.iter_daemons_of_role('nvmeof', cluster=self.cluster_name))
         # self.thread = gevent.spawn(self.do_thrash)
+        get_device_cmd = "sudo nvme list --output-format=json | " \
+            "jq -r '.Devices | sort_by(.NameSpace) | .[] | select(.ModelNumber == \"Ceph bdev Controller\") | .DevicePath'"
+        self.devices = self.remote.sh(get_device_cmd)
 
     def log(self, x):
         self.logger.info(x)
@@ -251,9 +255,16 @@ class NvmeofThrasher(Thrasher, Greenlet):
             self.log(f'waiting for {revive_delay} secs before reviving')
             gevent.sleep(revive_delay)
 
+            # display some stats before reviving
+            self.remote.sh('ceph orch ls')
+            for d in self.devices:
+                self.remote.sh(f'sudo nvme list-subsys {d}')
+
             # revive after thrashing
             for daemon in dameons_to_kill:
                 self.log('reviving {label}'.format(label=daemon.id_))
+                self.log(daemon.start_cmd)
+                self.log(daemon.remote)
                 daemon.start()
 
 class ThrashTest(Nvmeof):
@@ -268,9 +279,9 @@ class ThrashTest(Nvmeof):
         daemons = list(self.ctx.daemons.iter_daemons_of_role('nvmeof', self.cluster))
         assert len(daemons) > 1, \
             'nvmeof.thrash task requires at least 2 nvmeof daemon'
+        initiator_remote = get_remote_for_role(self.ctx, self.config.get('initiator'))  
+        self.thrasher = NvmeofThrasher(self.config, daemons, initiator_remote)
 
-        self.thrasher = NvmeofThrasher(self.config, daemons)
-    
     def begin(self):
         self.thrasher.start()
         self.ctx.ceph[self.cluster].thrashers.append(self.thrasher) 
