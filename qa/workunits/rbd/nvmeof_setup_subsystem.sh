@@ -44,7 +44,7 @@ do
     for j in $(seq 1 $NVMEOF_SUBSYSTEMS_COUNT); do
         subsystem_nqn="${NVMEOF_SUBSYSTEMS_PREFIX}${j}"
         echo "Adding gateway listener $index with IP ${ip} and name ${name}"
-        sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $ip --server-port $NVMEOF_SRPORT listener add --subsystem $subsystem_nqn --gateway-name client.$name --traddr $ip --trsvcid $NVMEOF_PORT
+        sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $ip --server-port $NVMEOF_SRPORT listener add --subsystem $subsystem_nqn --host-name $name --traddr $ip --trsvcid $NVMEOF_PORT
     done
 done
 

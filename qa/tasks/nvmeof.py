@@ -99,7 +99,8 @@ class Nvmeof(Task):
                 _shell(self.ctx, self.cluster_name, self.remote, [
                     'ceph', 'config', 'set', 'mgr', 
                     'mgr/cephadm/container_image_nvmeof',
-                    f'quay.io/ceph/nvmeof:{image}'
+                    'quay.io/barakda1/nvmeof:qe_ceph_devel_21e59b2' #TODO: remove
+                    # f'quay.io/ceph/nvmeof:{image}'
                 ])
 
             poolname = self.poolname
@@ -148,13 +149,14 @@ class Nvmeof(Task):
         gateway_ips = []
         nvmeof_daemons = self.ctx.daemons.iter_daemons_of_role('nvmeof', cluster=self.cluster_name)
         for daemon in nvmeof_daemons:
-            gateway_names += [daemon.name()]
+            gateway_names += [daemon.remote.shortname]
             gateway_ips += [daemon.remote.ip_address]
         conf_data = dedent(f"""
             NVMEOF_GATEWAY_IP_ADDRESSES={",".join(gateway_ips)}
             NVMEOF_GATEWAY_NAMES={",".join(gateway_names)}
             NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS={ip_address}
-            NVMEOF_CLI_IMAGE="quay.io/ceph/nvmeof-cli:{self.cli_image}"
+            # NVMEOF_CLI_IMAGE="quay.io/ceph/nvmeof-cli:{self.cli_image}" #TODO: remove
+            NVMEOF_CLI_IMAGE="quay.io/barakda1/nvmeof-cli:qe_ceph_devel_21e59b2"
             NVMEOF_SUBSYSTEMS_PREFIX={self.nqn_prefix}
             NVMEOF_SUBSYSTEMS_COUNT={self.subsystems_count}
             NVMEOF_NAMESPACES_COUNT={self.namespaces_count}
@@ -200,7 +202,7 @@ class NvmeofThrasher(Thrasher, Greenlet):
         # self.thread = gevent.spawn(self.do_thrash)
         get_device_cmd = "sudo nvme list --output-format=json | " \
             "jq -r '.Devices | sort_by(.NameSpace) | .[] | select(.ModelNumber == \"Ceph bdev Controller\") | .DevicePath'"
-        self.devices = self.remote.sh(get_device_cmd)
+        self.devices = self.remote.sh(get_device_cmd).split()
 
     def log(self, x):
         self.logger.info(x)
