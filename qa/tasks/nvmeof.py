@@ -267,7 +267,7 @@ class NvmeofThrasher(Thrasher, Greenlet):
                     self.log(f'skipping daemon {daemon.id_}: already thrashed {self.max_thrash_iters_each} times')
                     continue
 
-
+                daemon.remote.sh(daemon.status_cmd)
                 self.log('kill {label}'.format(label=daemon.id_))
                 # daemon.signal(signal.SIGTERM)
                 daemon.stop()
@@ -290,10 +290,10 @@ class NvmeofThrasher(Thrasher, Greenlet):
                 gevent.sleep(revive_delay)
 
                 # display some stats before reviving
-                self.log(f'display and verify stats before reviving')
-                self.remote.sh('ceph orch ls')
-                for d in self.devices:
-                    list_subsys_output = self.remote.sh(f'sudo nvme list-subsys {d}')
+                # self.log(f'display and verify stats before reviving')
+                # self.remote.sh('ceph orch ls')
+                # for d in self.devices:
+                #     list_subsys_output = self.remote.sh(f'sudo nvme list-subsys {d}')
                     # assert "live optimized" in list_subsys_output
 
                 # revive after thrashing

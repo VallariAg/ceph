@@ -50,12 +50,17 @@ tasks:
 - nvmeof.thrash:
     initiator: client.3
 
+- mon_thrash:
+    revive_delay: 60
+    thrash_delay: 60
+    thrash_many: true
+
 - workunit:
     no_coverage_and_limits: true
     timeout: 30m
     clients:
       client.3:
-        - rbd/nvmeof_fio_test.sh --rbd_iostat
+        - rbd/nvmeof_fio_test.sh --rbd_iostat --ha_check
     env:
       RBD_POOL: mypool
       IOSTAT_INTERVAL: '10'

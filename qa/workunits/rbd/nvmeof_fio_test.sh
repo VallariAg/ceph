@@ -6,6 +6,7 @@ sudo yum -y install sysstat
 namespace_range_start=
 namespace_range_end=
 rbd_iostat=false
+ha_check=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -19,6 +20,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --rbd_iostat)
             rbd_iostat=true
+            shift
+            ;;
+        --ha_check)
+            ha_check=true
             shift
             ;;
         *)
@@ -68,10 +73,21 @@ if [ -n "$IOSTAT_INTERVAL" ]; then
 fi
 if [ "$rbd_iostat" = true  ]; then
     iterations=$(( RUNTIME / 5 ))
-    rbd perf image iostat $RBD_POOL --iterations $iterations &
+    timeout 20 rbd perf image iostat $RBD_POOL --iterations $iterations &
+fi
+if [ "$ha_check" = true  ]; then
+    delay=10 #sec
+    iterations=$(( RUNTIME / 10 ))
+    for i in $(seq 1 $iterations); do
+        for device in $selected_drives; do
+            # sudo nvme list-subsys $device | grep -q "live optimized" || exit 1
+            sudo nvme list-subsys $device
+        done
+        sleep $delay
+    done &
 fi
 fio --showcmd $fio_file
 sudo fio $fio_file 
 wait
 
-echo "[nvmeo.fio] fio test successful!"
+echo "[nvmeof.fio] fio test successful!"
