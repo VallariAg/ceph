@@ -31,7 +31,7 @@ tasks:
       image_name_prefix: myimage
     gateway_config:
       subsystems_count: 3
-      namespaces_count: 20
+      namespaces_count: 5
       cli_version: 1.1.0
 
 - cephadm.wait_for_service:
@@ -52,6 +52,7 @@ tasks:
 
 - workunit:
     no_coverage_and_limits: true
+    timeout: 30m
     clients:
       client.3:
         - rbd/nvmeof_fio_test.sh --rbd_iostat

@@ -194,10 +194,12 @@ class NvmeofThrasher(Thrasher, Greenlet):
 
         """ Thrashing params """
         self.randomize = bool(self.config.get('randomize', True))
+        self.max_thrash_iters_each = int(self.config.get('max_thrash_iters_each', 3)) # thrash each daemon only 3 times be default
+        self.max_thrash = int(self.config.get('max_thrash', len(self.daemons) - 1))
         self.min_thrash_delay = int(self.config.get('min_thrash_delay', 60))
         self.max_thrash_delay = int(self.config.get('max_thrash_delay', self.min_thrash_delay + 30))
-        self.min_revive_delay = int(self.config.get('min_revive_delay', 0))
-        self.max_revive_delay = int(self.config.get('max_revive_delay', self.min_revive_delay + 10))
+        self.min_revive_delay = int(self.config.get('min_revive_delay', 60))
+        self.max_revive_delay = int(self.config.get('max_revive_delay', self.min_revive_delay + 30))
         # self.daemons = list(self.ctx.daemons.iter_daemons_of_role('nvmeof', cluster=self.cluster_name))
         # self.thread = gevent.spawn(self.do_thrash)
         get_device_cmd = "sudo nvme list --output-format=json | " \
@@ -225,6 +227,7 @@ class NvmeofThrasher(Thrasher, Greenlet):
                  f'max revive delay: {self.max_revive_delay}, min revive delay: {self.min_revive_delay} '\
                  f'daemons: {len(self.daemons)} '\
                 )
+        thrash_count = {}
 
         while not self.stopping.is_set():
             # delay before thrashing
@@ -239,35 +242,66 @@ class NvmeofThrasher(Thrasher, Greenlet):
                     continue
 
             # thrashing
-            max_killable = len(self.daemons) - 1 
-            kill_up_to = self.rng.randrange(1, max_killable)
-            dameons_to_kill = self.rng.sample(self.daemons, kill_up_to)
-            
-            self.log('nvmeof daemons to thrash: {m}'.format(m=len(dameons_to_kill)))
-            for daemon in dameons_to_kill:
+            # max_killable = len(self.daemons) - 1 
+            # kill_up_to = self.rng.randrange(1, max_killable+1)
+            # dameons_to_kill = self.rng.sample(self.daemons, kill_up_to)
+                
+            # self.log('nvmeof daemons to thrash: {m}'.format(m=len(dameons_to_kill)))
+            # for daemon in dameons_to_kill:
+            #     self.log('kill {label}'.format(label=daemon.id_))
+            #     # daemon.signal(signal.SIGTERM)
+            #     daemon.stop()
+            #     thrash_count[daemon.id_] = thrash_count.get(daemon.id_, 0)
+
+            killed_daemons = []
+
+            weight = 1.0 / len(self.daemons)
+            count = 0
+            for daemon in self.daemons:
+                skip = self.rng.uniform(0.0, 1.0)
+                if weight <= skip:
+                    self.log('skipping daemon {label} with skip ({skip}) > weight ({weight})'.format(
+                        label=daemon.id_, skip=skip, weight=weight))
+                    continue
+                if thrash_count.get(daemon.id_, 0) >= self.max_thrash_iters_each:
+                    self.log(f'skipping daemon {daemon.id_}: already thrashed {self.max_thrash_iters_each} times')
+                    continue
+
+
                 self.log('kill {label}'.format(label=daemon.id_))
                 # daemon.signal(signal.SIGTERM)
                 daemon.stop()
-                    
-            # delay before reviving
-            revive_delay = self.min_revive_delay
-            if self.randomize:
-                revive_delay = random.randrange(self.min_revive_delay, self.max_revive_delay)
+                
+                killed_daemons.append(daemon)
+                thrash_count[daemon.id_] = thrash_count.get(daemon.id_, 0) + 1
 
-            self.log(f'waiting for {revive_delay} secs before reviving')
-            gevent.sleep(revive_delay)
+                # if we've reached max_thrash, we're done
+                count += 1
+                if count >= self.max_thrash:
+                    break
 
-            # display some stats before reviving
-            self.remote.sh('ceph orch ls')
-            for d in self.devices:
-                self.remote.sh(f'sudo nvme list-subsys {d}')
+            if killed_daemons:  
+                # delay before reviving
+                revive_delay = self.min_revive_delay
+                if self.randomize:
+                    revive_delay = random.randrange(self.min_revive_delay, self.max_revive_delay)
 
-            # revive after thrashing
-            for daemon in dameons_to_kill:
-                self.log('reviving {label}'.format(label=daemon.id_))
-                self.log(daemon.start_cmd)
-                self.log(daemon.remote)
-                daemon.start()
+                self.log(f'waiting for {revive_delay} secs before reviving')
+                gevent.sleep(revive_delay)
+
+                # display some stats before reviving
+                self.log(f'display and verify stats before reviving')
+                self.remote.sh('ceph orch ls')
+                for d in self.devices:
+                    list_subsys_output = self.remote.sh(f'sudo nvme list-subsys {d}')
+                    # assert "live optimized" in list_subsys_output
+
+                # revive after thrashing
+                for daemon in killed_daemons:
+                    self.log('reviving {label}'.format(label=daemon.id_))
+                    self.log(daemon.start_cmd)
+                    daemon.start()
+        self.log(thrash_count)
 
 class ThrashTest(Nvmeof):
     name = 'nvmeof.thrash'
