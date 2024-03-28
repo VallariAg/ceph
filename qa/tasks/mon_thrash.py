@@ -8,6 +8,7 @@ import time
 import gevent
 import json
 import math
+from gevent.event import Event
 from teuthology import misc as teuthology
 from teuthology.contextutil import safe_while
 from tasks import ceph_manager
@@ -43,6 +44,10 @@ class MonitorThrasher(Thrasher):
                         the monitor (default: 10)
     thrash_delay        Number of seconds to wait in-between
                         test iterations (default: 0)
+    switch_thrashers:   Toggle this to switch between thrashers so it waits until all
+                        thrashers are done thrashing before proceeding. And then
+                        wait until all thrashers are done reviving before proceeding.
+                        (default: false) 
     store_thrash        Thrash monitor store before killing the monitor being thrashed (default: False)
     store_thrash_probability  Probability of thrashing a monitor's store
                               (default: 50)
@@ -100,6 +105,9 @@ class MonitorThrasher(Thrasher):
 
         if self.config is None:
             self.config = dict()
+
+        if self.config.get("switch_thrashers"): 
+            self.is_done = Event()
 
         """ Test reproducibility """
         self.random_seed = self.config.get('seed', None)
@@ -211,7 +219,6 @@ class MonitorThrasher(Thrasher):
         """
         Revive the monitor specified
         """
-        self.log('killing mon.{id}'.format(id=mon))
         self.log('reviving mon.{id}'.format(id=mon))
         self.manager.revive_mon(mon)
 
@@ -256,6 +263,27 @@ class MonitorThrasher(Thrasher):
             self.logger.exception("exception:")
             # Allow successful completion so gevent doesn't see an exception.
             # The DaemonWatchdog will observe the error and tear down the test.
+
+    def switch_task(self):
+        """
+        Pause mon thrasher till other thrashers are done with their iteration.
+        This would help to sync between multiple thrashers, like:
+        1. thrasher-1 and thrasher-2: thrash daemons in parallel
+        2. thrasher-1 and thrasher-2: revive daemons in parallel 
+        This allows us to run some checks after each thrashing and reviving iteration.
+        """
+        if not hasattr(self, 'is_done'):
+            return
+        self.is_done.set()
+        thrashers = self.ctx.ceph[self.config.get('cluster')].thrashers
+        for t in thrashers:
+            if not isinstance(t, MonitorThrasher) and hasattr(t, 'is_done') and (
+                (isinstance(t.stopping, bool) and not t.stopping) or 
+                (isinstance(t.stopping, Event) and not t.stopping.is_set())
+            ):
+                other_thrasher = t
+                other_thrasher.is_done.wait(300)
+                other_thrasher.is_done.clear()
 
     def _do_thrash(self):
         """
@@ -337,6 +365,8 @@ class MonitorThrasher(Thrasher):
                 delay=self.revive_delay))
             time.sleep(self.revive_delay)
 
+            self.switch_task()
+
             for mon in mons_to_kill:
                 self.revive_mon(mon)
             # do more freezes
@@ -372,6 +402,8 @@ class MonitorThrasher(Thrasher):
                     delay=self.thrash_delay))
                 time.sleep(self.thrash_delay)
 
+            self.switch_task()
+
         #status after thrashing
         if self.mds_failover:
             status = self.mds_cluster.status()
@@ -398,6 +430,8 @@ def task(ctx, config):
     if 'cluster' not in config:
         config['cluster'] = 'ceph'
 
+    logger = config.get('logger', 'mon_thrasher')
+
     log.info('Beginning mon_thrash...')
     first_mon = teuthology.get_first_mon(ctx, config)
     (mon,) = ctx.cluster.only(first_mon).remotes.keys()
@@ -408,7 +442,7 @@ def task(ctx, config):
         )
     thrash_proc = MonitorThrasher(ctx,
         manager, config, "MonitorThrasher",
-        logger=log.getChild('mon_thrasher'))
+        logger=log.getChild(logger))
     ctx.ceph[config['cluster']].thrashers.append(thrash_proc)
     try:
         log.debug('Yielding')
