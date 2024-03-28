@@ -8,6 +8,7 @@ import time
 import gevent
 import json
 import math
+from gevent.event import Event
 from teuthology import misc as teuthology
 from teuthology.contextutil import safe_while
 from tasks import ceph_manager
@@ -100,6 +101,9 @@ class MonitorThrasher(Thrasher):
 
         if self.config is None:
             self.config = dict()
+
+        if self.config.get("switch_thrashers"): 
+            self.ispaused = Event()
 
         """ Test reproducibility """
         self.random_seed = self.config.get('seed', None)
@@ -211,7 +215,6 @@ class MonitorThrasher(Thrasher):
         """
         Revive the monitor specified
         """
-        self.log('killing mon.{id}'.format(id=mon))
         self.log('reviving mon.{id}'.format(id=mon))
         self.manager.revive_mon(mon)
 
@@ -256,6 +259,18 @@ class MonitorThrasher(Thrasher):
             self.logger.exception("exception:")
             # Allow successful completion so gevent doesn't see an exception.
             # The DaemonWatchdog will observe the error and tear down the test.
+
+    def switch_task(self):
+        "Pause monthrash until other thrasher's do their tharshing and unpause it"
+        thrashers = self.ctx.ceph[self.config.get('cluster')].thrashers
+        other_thrasher = None
+        for t in thrashers:
+            if not isinstance(t, MonitorThrasher) and hasattr(t, 'ispaused'):
+                other_thrasher = t.ispaused
+        if other_thrasher:
+            self.ispaused.set() # pause monthrash
+            other_thrasher.wait()
+            other_thrasher.clear()
 
     def _do_thrash(self):
         """
@@ -337,6 +352,8 @@ class MonitorThrasher(Thrasher):
                 delay=self.revive_delay))
             time.sleep(self.revive_delay)
 
+            self.switch_task()
+
             for mon in mons_to_kill:
                 self.revive_mon(mon)
             # do more freezes
@@ -372,6 +389,8 @@ class MonitorThrasher(Thrasher):
                     delay=self.thrash_delay))
                 time.sleep(self.thrash_delay)
 
+            self.switch_task()
+
         #status after thrashing
         if self.mds_failover:
             status = self.mds_cluster.status()
@@ -398,6 +417,8 @@ def task(ctx, config):
     if 'cluster' not in config:
         config['cluster'] = 'ceph'
 
+    logger = config.get('logger', 'mon_thrasher')
+
     log.info('Beginning mon_thrash...')
     first_mon = teuthology.get_first_mon(ctx, config)
     (mon,) = ctx.cluster.only(first_mon).remotes.keys()
@@ -408,7 +429,7 @@ def task(ctx, config):
         )
     thrash_proc = MonitorThrasher(ctx,
         manager, config, "MonitorThrasher",
-        logger=log.getChild('mon_thrasher'))
+        logger=log.getChild(logger))
     ctx.ceph[config['cluster']].thrashers.append(thrash_proc)
     try:
         log.debug('Yielding')
