@@ -220,16 +220,16 @@ class NvmeofThrasher(Thrasher, Greenlet):
         thrash_count = {}
 
         while not self.stopping.is_set():
-            # delay before thrashing
-            thrash_delay = self.min_thrash_delay
-            if self.randomize:
-                thrash_delay = random.randrange(self.min_thrash_delay, self.max_thrash_delay)
+            # # delay before thrashing
+            # thrash_delay = self.min_thrash_delay
+            # if self.randomize:
+            #     thrash_delay = random.randrange(self.min_thrash_delay, self.max_thrash_delay)
 
-            if thrash_delay > 0.0:
-                self.log(f'waiting for {thrash_delay} secs before thrashing')
-                self.stopping.wait(thrash_delay)
-                if self.stopping.is_set():
-                    continue
+            # if thrash_delay > 0.0:
+            #     self.log(f'waiting for {thrash_delay} secs before thrashing')
+            #     self.stopping.wait(thrash_delay) # blocking wait
+            #     if self.stopping.is_set():
+            #         continue
 
             killed_daemons = []
 
@@ -263,13 +263,66 @@ class NvmeofThrasher(Thrasher, Greenlet):
                     revive_delay = random.randrange(self.min_revive_delay, self.max_revive_delay)
 
                 self.log(f'waiting for {revive_delay} secs before reviving')
-                gevent.sleep(revive_delay)
+                time.sleep(revive_delay) # blocking wait
+
+                gevent.sleep() # give back control to verify 
 
                 # revive after thrashing
                 for daemon in killed_daemons:
                     self.log('reviving {label}'.format(label=daemon.id_))
                     daemon.start()
+                
+                # delay before thrashing
+                thrash_delay = self.min_thrash_delay
+                if self.randomize:
+                    thrash_delay = random.randrange(self.min_thrash_delay, self.max_thrash_delay)
+                if thrash_delay > 0.0:
+                    self.log(f'waiting for {thrash_delay} secs before thrashing')
+                    self.stopping.wait(thrash_delay) # blocking wait
+                    if self.stopping.is_set():
+                        continue
+
+                gevent.sleep() # give back control to verify 
         self.log(thrash_count)
+
+
+class NvmeofThrasherVerifier(Greenlet):
+    def __init__(self, remote) -> None:
+        super(NvmeofThrasherVerifier, self).__init__()
+        GET_DEVICE_CMD = "sudo nvme list --output-format=json | " \
+            "jq -r '.Devices | sort_by(.NameSpace) | .[] | select(.ModelNumber == \"Ceph bdev Controller\") | .DevicePath'"
+
+        self.logger = log.getChild('[nvmeof.thrasher.verifier]')
+        self.stopping = Event()
+        self._exception = None
+
+        self.remote = remote
+        self.devices = remote.sh(GET_DEVICE_CMD).split()
+    
+    @property
+    def exception(self):
+        return self._exception
+    
+    def log(self, x):
+        self.logger.info(x)
+    
+    def stop(self):
+        self.stopping.set()
+    
+    def _run(self): # overriding 
+        # try:
+        while not self.stopping.is_set():
+            self.log(f'display and verify stats before reviving')
+            self.remote.sh('ceph orch ls')
+            for dev in self.devices:
+                output = self.remote.sh(f'sudo nvme list-subsys {dev}')
+                assert "live optimized" in output
+            gevent.sleep()
+        # except Exception as e: # TODO: we actually want to stop if we see an AssertException so maybe this logic won't work here
+        #     self._exception = e
+        #     self.logger.exception("exception:")
+            # allow successful completion so gevent doesn't see an exception...
+
 
 class ThrashTest(Nvmeof):
     name = 'nvmeof.thrash'
@@ -285,16 +338,24 @@ class ThrashTest(Nvmeof):
             'nvmeof.thrash task requires at least 2 nvmeof daemon'
         self.thrasher = NvmeofThrasher(self.config, daemons)
 
+        checker_host = get_remote_for_role(self.ctx, self.config.get('checker_host'))  
+        self.verifier = NvmeofThrasherVerifier(remote=checker_host)
+
     def begin(self):
         self.thrasher.start()
+        self.verifier.start()
         self.ctx.ceph[self.cluster].thrashers.append(self.thrasher) 
 
     def end(self):
         log.info('joining nvmeof.thrash')
         self.thrasher.stop()
+        self.verifier.stop()
         if self.thrasher.exception is not None:
             raise RuntimeError('error during thrashing')
+        if self.verifier.exception is not None:
+            raise RuntimeError('error during verification')
         self.thrasher.join()
+        self.verifier.join()
         log.info('done joining')
 
 

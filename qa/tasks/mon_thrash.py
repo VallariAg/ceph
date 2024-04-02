@@ -141,6 +141,8 @@ class MonitorThrasher(Thrasher):
         if self.mds_failover:
             self.mds_cluster = MDSCluster(ctx)
 
+        self.give_up_control = self.config.get('give_up_control', False)
+
         self.thread = gevent.spawn(self.do_thrash)
 
     def log(self, x):
@@ -336,6 +338,9 @@ class MonitorThrasher(Thrasher):
             self.log('waiting for {delay} secs before reviving monitors'.format(
                 delay=self.revive_delay))
             time.sleep(self.revive_delay)
+            
+            if self.give_up_control:
+                gevent.sleep()
 
             for mon in mons_to_kill:
                 self.revive_mon(mon)
@@ -371,6 +376,9 @@ class MonitorThrasher(Thrasher):
                 self.log('waiting for {delay} secs before continuing thrashing'.format(
                     delay=self.thrash_delay))
                 time.sleep(self.thrash_delay)
+            
+            if self.give_up_control:
+                gevent.sleep()
 
         #status after thrashing
         if self.mds_failover:

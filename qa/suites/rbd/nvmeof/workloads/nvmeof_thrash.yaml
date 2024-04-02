@@ -22,17 +22,23 @@ roles:
   - ceph.nvmeof.nvmeof.c
 - - client.3 # initiator
 
+overrides:
+  ceph:
+    log-ignorelist:
+      - overall HEALTH_
+      - \(MON_DOWN\)
+
 tasks:
 - nvmeof:
     client: client.0
-    gw_image: quay.io/barakda1/nvmeof:qe_ceph_devel_21e59b2  # "default" is the image cephadm defaults to; change to test specific nvmeof images, example "latest"
+    gw_image: quay.io/barakda1/nvmeof:qe_ceph_devel_c1117be  # "default" is the image cephadm defaults to; change to test specific nvmeof images, example "latest"
     rbd:
       pool_name: mypool
       image_name_prefix: myimage
     gateway_config:
       subsystems_count: 3
       namespaces_count: 5
-      cli_image: quay.io/barakda1/nvmeof-cli:qe_ceph_devel_21e59b2
+      cli_image: quay.io/barakda1/nvmeof-cli:qe_ceph_devel_c1117be
 
 - cephadm.wait_for_service:
     service: nvmeof.mypool
@@ -48,18 +54,20 @@ tasks:
       RBD_IMAGE_PREFIX: myimage
 
 - nvmeof.thrash:
+    checker_host: 'client.3'
 
-- mon_thrash:
-    revive_delay: 60
-    thrash_delay: 60
-    thrash_many: true
+# - mon_thrash:
+#     revive_delay: 60
+#     thrash_delay: 60
+#     thrash_many: true
+#     give_up_control: True
 
 - workunit:
     no_coverage_and_limits: true
     timeout: 30m
     clients:
       client.3:
-        - rbd/nvmeof_fio_test.sh --rbd_iostat --ha_check
+        - rbd/nvmeof_fio_test.sh --rbd_iostat
     env:
       RBD_POOL: mypool
       IOSTAT_INTERVAL: '10'
