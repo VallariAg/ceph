@@ -1,7 +1,7 @@
 tasks:
 - nvmeof:
     client: client.0
-    version: default  # "default" is the image cephadm defaults to; change to test specific nvmeof images, example "latest"
+    version: hardcoded  # "default" is the image cephadm defaults to; change to test specific nvmeof images, example "latest"
     rbd:
       pool_name: mypool
       image_name_prefix: myimage
