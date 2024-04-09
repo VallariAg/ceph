@@ -141,7 +141,7 @@ class MonitorThrasher(Thrasher):
         if self.mds_failover:
             self.mds_cluster = MDSCluster(ctx)
 
-        self.give_up_control = self.config.get('give_up_control', False)
+        # self.give_up_control = self.config.get('give_up_control', False)
 
         self.thread = gevent.spawn(self.do_thrash)
 
@@ -259,6 +259,12 @@ class MonitorThrasher(Thrasher):
             # Allow successful completion so gevent doesn't see an exception.
             # The DaemonWatchdog will observe the error and tear down the test.
 
+    def switch_greenlet(self):
+        switch_event = self.ctx.ceph[self.config['cluster']].thrasher_switch
+        if switch_event:
+            switch_event.set()
+            gevent.sleep()
+
     def _do_thrash(self):
         """
         Continuously loop and thrash the monitors.
@@ -339,8 +345,9 @@ class MonitorThrasher(Thrasher):
                 delay=self.revive_delay))
             time.sleep(self.revive_delay)
             
-            if self.give_up_control:
-                gevent.sleep()
+            # if self.give_up_control:
+            #     gevent.sleep()
+            self.switch_greenlet()
 
             for mon in mons_to_kill:
                 self.revive_mon(mon)
@@ -377,8 +384,9 @@ class MonitorThrasher(Thrasher):
                     delay=self.thrash_delay))
                 time.sleep(self.thrash_delay)
             
-            if self.give_up_control:
-                gevent.sleep()
+            # if self.give_up_control:
+            #     gevent.sleep()
+            self.switch_greenlet()
 
         #status after thrashing
         if self.mds_failover:
@@ -416,7 +424,7 @@ def task(ctx, config):
         )
     thrash_proc = MonitorThrasher(ctx,
         manager, config, "MonitorThrasher",
-        logger=log.getChild('mon_thrasher'))
+        logger=log.getChild('[nvmeof.thrasher.mon_thrasher]'))
     ctx.ceph[config['cluster']].thrashers.append(thrash_proc)
     try:
         log.debug('Yielding')

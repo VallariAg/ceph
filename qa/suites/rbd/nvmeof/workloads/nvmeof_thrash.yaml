@@ -31,14 +31,14 @@ overrides:
 tasks:
 - nvmeof:
     client: client.0
-    gw_image: quay.io/barakda1/nvmeof:qe_ceph_devel_c1117be  # "default" is the image cephadm defaults to; change to test specific nvmeof images, example "latest"
+    gw_image: quay.io/barakda1/nvmeof:1.2.1 # "default" is the image cephadm defaults to; change to test specific nvmeof images, example "latest"
     rbd:
       pool_name: mypool
       image_name_prefix: myimage
     gateway_config:
       subsystems_count: 3
       namespaces_count: 5
-      cli_image: quay.io/barakda1/nvmeof-cli:qe_ceph_devel_c1117be
+      cli_image: quay.io/barakda1/nvmeof-cli:1.2.1
 
 - cephadm.wait_for_service:
     service: nvmeof.mypool
@@ -56,11 +56,11 @@ tasks:
 - nvmeof.thrash:
     checker_host: 'client.3'
 
-# - mon_thrash:
-#     revive_delay: 60
-#     thrash_delay: 60
-#     thrash_many: true
-#     give_up_control: True
+- mon_thrash:
+    revive_delay: 60
+    thrash_delay: 60
+    thrash_many: true
+    # give_up_control: True
 
 - workunit:
     no_coverage_and_limits: true
