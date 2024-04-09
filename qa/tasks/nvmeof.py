@@ -90,7 +90,8 @@ class Nvmeof(Task):
                 _shell(self.ctx, self.cluster_name, self.remote, [
                     'ceph', 'config', 'set', 'mgr', 
                     'mgr/cephadm/container_image_nvmeof',
-                    f'quay.io/ceph/nvmeof:{image}'
+                    # f'quay.io/ceph/nvmeof:{image}'
+                    'quay.io/barakda1/nvmeof:1.2.1'
                 ])
 
             poolname = self.poolname
@@ -144,7 +145,7 @@ class Nvmeof(Task):
             NVMEOF_GATEWAY_IP_ADDRESSES={",".join(gateway_ips)}
             NVMEOF_GATEWAY_NAMES={",".join(gateway_names)}
             NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS={ip_address}
-            NVMEOF_CLI_IMAGE="quay.io/ceph/nvmeof-cli:{self.cli_image}"
+            NVMEOF_CLI_IMAGE="quay.io/barakda1/nvmeof-cli:1.2.1"
             NVMEOF_NAMESPACES_COUNT={self.namespaces_count}
             NVMEOF_NQN={self.nqn}
             NVMEOF_PORT={self.port}
