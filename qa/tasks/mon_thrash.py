@@ -8,6 +8,7 @@ import time
 import gevent
 import json
 import math
+from gevent.event import Event
 from teuthology import misc as teuthology
 from teuthology.contextutil import safe_while
 from tasks import ceph_manager
@@ -100,6 +101,9 @@ class MonitorThrasher(Thrasher):
 
         if self.config is None:
             self.config = dict()
+
+        if self.config.get("switch_thrashers"): 
+            self.ispaused = Event()
 
         """ Test reproducibility """
         self.random_seed = self.config.get('seed', None)
@@ -213,7 +217,7 @@ class MonitorThrasher(Thrasher):
         """
         Revive the monitor specified
         """
-        self.log('killing mon.{id}'.format(id=mon))
+        # self.log('killing mon.{id}'.format(id=mon)) 
         self.log('reviving mon.{id}'.format(id=mon))
         self.manager.revive_mon(mon)
 
@@ -259,11 +263,28 @@ class MonitorThrasher(Thrasher):
             # Allow successful completion so gevent doesn't see an exception.
             # The DaemonWatchdog will observe the error and tear down the test.
 
-    def switch_greenlet(self):
-        switch_event = self.ctx.ceph[self.config['cluster']].thrasher_switch
-        if switch_event:
-            switch_event.set()
-            gevent.sleep()
+    # def switch_greenlet(self):
+    #     switch_event = self.ctx.ceph[self.config['cluster']].thrasher_switch
+    #     if switch_event:
+    #         switch_event.set()
+    #         self.nvmeof_pause.wait()
+    #             # gevent.sleep()
+    #         self.nvmeof_pause.clear()
+
+    def switch_task(self):
+        "Pause nvmeof till mon_ispaused is set"
+        thrashers = self.ctx.ceph[self.config.get('cluster')].thrashers
+        other_ispaused = None
+        for t in thrashers:
+            if not isinstance(t, MonitorThrasher) and hasattr(t, 'ispaused'):
+                other_ispaused = t.ispaused
+        self.log('switch_task')
+        if other_ispaused:
+            self.log('other_ispaused exists')
+            self.ispaused.set() # pause monthrash: to wait for other thrasher (when it's done it will set 'other_ispaused')
+            other_ispaused.wait() # pausing monthrash
+            # gevent.sleep()
+            other_ispaused.clear()
 
     def _do_thrash(self):
         """
@@ -347,7 +368,8 @@ class MonitorThrasher(Thrasher):
             
             # if self.give_up_control:
             #     gevent.sleep()
-            self.switch_greenlet()
+            # self.switch_greenlet()
+            self.switch_task()
 
             for mon in mons_to_kill:
                 self.revive_mon(mon)
@@ -386,7 +408,8 @@ class MonitorThrasher(Thrasher):
             
             # if self.give_up_control:
             #     gevent.sleep()
-            self.switch_greenlet()
+            # self.switch_greenlet()
+            self.switch_task()
 
         #status after thrashing
         if self.mds_failover:

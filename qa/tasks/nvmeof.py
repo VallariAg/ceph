@@ -169,17 +169,20 @@ class Nvmeof(Task):
 
 
 class NvmeofThrasher(Thrasher, Greenlet):
-    def __init__(self, config, daemons, checker_host, switch_event) -> None:
+    def __init__(self, ctx, config, daemons) -> None:
         super(NvmeofThrasher, self).__init__()
 
         if config is None:
             self.config = dict()
         self.config = config
+        self.ctx = ctx
         self.daemons = daemons
         self.logger = log.getChild('[nvmeof.thrasher]')
         self.stopping = Event()
-        self.switch_event = switch_event
-        self.checker_host = checker_host
+        # self.switch_event = switch_event
+        if self.config.get("switch_thrashers"): 
+            self.ispaused = Event()
+        self.checker_host = get_remote_for_role(self.ctx, self.config.get('checker_host'))
         self.devices = self._get_devices(self.checker_host)
 
         """ Random seed """
@@ -225,6 +228,21 @@ class NvmeofThrasher(Thrasher, Greenlet):
         for dev in self.devices:
             output = self.checker_host.sh(f'sudo nvme list-subsys {dev}')
             assert "live optimized" in output
+    
+    def switch_task(self):
+        "Pause nvmeof till other is set"
+        thrashers = self.ctx.ceph[self.config.get('cluster')].thrashers
+        other_ispaused = None
+        for t in thrashers:
+            if not isinstance(t, NvmeofThrasher) and hasattr(t, 'ispaused'):
+                other_ispaused = t.ispaused
+        self.log('switch_task')
+        if other_ispaused:
+            self.log('other_ispaused exists')
+            self.ispaused.set() # pause nvmeof: to wait for other thrasher (when it's done it will set 'other_ispaused')
+            other_ispaused.wait() # pausing nvmeof
+            # gevent.sleep()
+            other_ispaused.clear()
 
     def do_thrash(self):
         self.log('start thrashing')
@@ -283,9 +301,11 @@ class NvmeofThrasher(Thrasher, Greenlet):
                 self.log('reviving time.sleep over')
 
                 # gevent.sleep() # give back control to verify
-                self.switch_event.wait()
-                # gevent.sleep()
-                self.switch_event.clear()
+                # self.nvmeof_pause.set()
+                # self.switch_event.wait()
+                # # gevent.sleep()
+                # self.switch_event.clear()
+                self.switch_task()
                 self.check_status()
 
                 # revive after thrashing
@@ -306,9 +326,11 @@ class NvmeofThrasher(Thrasher, Greenlet):
                         continue
 
                 # gevent.sleep() # give back control to verify
-                self.switch_event.wait()
-                # gevent.sleep()
-                self.switch_event.clear() 
+                # self.nvmeof_pause.set()
+                # self.switch_event.wait()
+                # # gevent.sleep()
+                # self.switch_event.clear()
+                self.switch_task() 
                 self.check_status()
         self.log(thrash_count)
 
@@ -359,17 +381,17 @@ class ThrashTest(Nvmeof):
         assert isinstance(self.config, dict), \
             'nvmeof.thrash task only accepts a dict for configuration'
 
-        self.cluster = self.config.get('cluster', 'ceph')
+        self.cluster = self.config['cluster'] = self.config.get('cluster', 'ceph')
         daemons = list(self.ctx.daemons.iter_daemons_of_role('nvmeof', self.cluster))
         assert len(daemons) > 1, \
             'nvmeof.thrash task requires at least 2 nvmeof daemon'
 
-        self.switch_event = Event()
-        checker_host = get_remote_for_role(self.ctx, self.config.get('checker_host'))
+        # self.nvmeof_ispaused = Event()
+        # self.mon_ispaused = Event()
 
-        self.thrasher = NvmeofThrasher(self.config, daemons, checker_host, self.switch_event)
+        self.thrasher = NvmeofThrasher(self.ctx, self.config, daemons)
         self.ctx.ceph[self.cluster].thrashers.append(self.thrasher)
-        self.ctx.ceph[self.cluster].thrasher_switch = self.switch_event
+        # self.ctx.ceph[self.cluster].thrasher_switches = {"nvmeof": self.nvmeof_ispaused, "mon": self.mon_ispaused}
         # self.verifier = NvmeofThrasherVerifier(checker_host, self.shared_event)
 
     def begin(self):

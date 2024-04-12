@@ -55,11 +55,13 @@ tasks:
 
 - nvmeof.thrash:
     checker_host: 'client.3'
+    switch_thrashers: True
 
 - mon_thrash:
     revive_delay: 60
     thrash_delay: 60
     thrash_many: true
+    switch_thrashers: True
     # give_up_control: True
 
 - workunit:
