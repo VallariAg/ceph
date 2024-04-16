@@ -26,7 +26,9 @@ overrides:
   ceph:
     conf:
       mon:
-        mon op complaint time: 120
+        mon op complaint time: 300
+        # cephadm can take up to 5 minutes to bring up remaining mons
+        mon down mkfs grace: 300
     log-ignorelist:
       - overall HEALTH_
       - \(MON_DOWN\)

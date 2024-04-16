@@ -2,12 +2,15 @@ import logging
 import random
 import time
 import gevent
+from io import StringIO
+from datetime import datetime
 from textwrap import dedent
 from gevent.event import Event
 from gevent.greenlet import Greenlet
 from teuthology.task import Task
 from teuthology import misc
 from teuthology.exceptions import ConfigError
+from teuthology.orchestra import run
 from tasks.util import get_remote_for_role
 from tasks.cephadm import _shell
 from tasks.thrasher import Thrasher
@@ -223,11 +226,21 @@ class NvmeofThrasher(Thrasher, Greenlet):
 
     def check_status(self):
         self.log(f'display and verify stats before reviving')
-        self.checker_host.sh('ceph orch ls')
+        # funcs = []
+        # run.wait(
+        #     [self.checker_host.run(args="ceph orch ls")]
+        #     + [
+        #         self.checker_host.run(args=f"sudo nvme list-subsys {dev}")
+        #         for dev in self.devices
+        #     ]
+        # )
+        self.checker_host.run(args='ceph orch ls').wait()
         for dev in self.devices:
-            output = self.checker_host.sh(f'sudo nvme list-subsys {dev}')
+            proc = self.checker_host.run(args=f'sudo nvme list-subsys {dev}', stdout=StringIO())
+            proc.wait()
+            output = proc.stdout.getvalue()
             assert "live optimized" in output
-    
+
     def switch_task(self):
         "Pause nvmeof till other is set"
         thrashers = self.ctx.ceph[self.config.get('cluster')].thrashers
@@ -266,7 +279,7 @@ class NvmeofThrasher(Thrasher, Greenlet):
 
                 self.log('kill {label}'.format(label=daemon.id_))
                 daemon.stop()
-                
+
                 killed_daemons.append(daemon)
                 thrash_count[daemon.id_] = thrash_count.get(daemon.id_, 0) + 1
 
