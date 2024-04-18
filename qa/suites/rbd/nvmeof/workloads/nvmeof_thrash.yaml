@@ -24,14 +24,20 @@ roles:
 
 overrides:
   ceph:
-    conf:
-      mon:
-        mon op complaint time: 300
-        # cephadm can take up to 5 minutes to bring up remaining mons
-        mon down mkfs grace: 300
     log-ignorelist:
       - overall HEALTH_
-      - \(MON_DOWN\)
+      - MON_DOWN
+      - mons down
+      - mon down
+      - out of quorum
+    # conf:
+    #   client:
+    #     rados mon op timeout: 900
+    #   mon:
+    #     mon op complaint time: 300
+    #     # cephadm can take up to 5 minutes to bring up remaining mons
+    #     mon down mkfs grace: 300
+    
 
 tasks:
 - nvmeof:

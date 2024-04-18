@@ -226,6 +226,15 @@ class NvmeofThrasher(Thrasher, Greenlet):
 
     def check_status(self):
         self.log(f'display and verify stats before reviving')
+        check_cmd = [
+            'ceph', 'orch', 'ls'
+        ]
+        for dev in self.devices:
+            check_cmd += [
+                run.Raw('&&'), 'sudo', 'nvme', 'list-subsys', dev,
+                run.Raw('|'), 'grep', 'live optimized'
+            ]
+        
         # funcs = []
         # run.wait(
         #     [self.checker_host.run(args="ceph orch ls")]
@@ -234,12 +243,14 @@ class NvmeofThrasher(Thrasher, Greenlet):
         #         for dev in self.devices
         #     ]
         # )
-        self.checker_host.run(args='ceph orch ls').wait()
-        for dev in self.devices:
-            proc = self.checker_host.run(args=f'sudo nvme list-subsys {dev}', stdout=StringIO())
-            proc.wait()
-            output = proc.stdout.getvalue()
-            assert "live optimized" in output
+        self.checker_host.run(args=check_cmd).wait()
+        # if exitcode != 0:
+        #     raise Exception('failed verification')
+        # for dev in self.devices:
+        #     proc = self.checker_host.run(args=f'sudo nvme list-subsys {dev}', stdout=StringIO())
+        #     proc.wait()
+        #     output = proc.stdout.getvalue()
+        #     assert "live optimized" in output
 
     def switch_task(self):
         "Pause nvmeof till other is set"
