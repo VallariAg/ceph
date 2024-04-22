@@ -2,6 +2,7 @@ import logging
 import random
 import time
 import gevent
+from collections import defaultdict
 from io import StringIO
 from datetime import datetime
 from textwrap import dedent
@@ -197,8 +198,13 @@ class NvmeofThrasher(Thrasher, Greenlet):
 
         """ Thrashing params """
         self.randomize = bool(self.config.get('randomize', True))
-        self.max_thrash_iters_each = int(self.config.get('max_thrash_iters_each', 3)) # thrash each daemon only 3 times be default
-        self.max_thrash = int(self.config.get('max_thrash', len(self.daemons) - 1))
+        # self.max_thrash_iters_each = int(self.config.get('max_thrash_iters_each', 3)) # thrash each daemon only 3 times be default
+        self.max_thrash_daemons = int(self.config.get('max_thrash', len(self.daemons) - 1))
+
+        # Limits on thrashing each daemon
+        self.daemon_max_thrash_times = int(self.config.get('daemon_max_thrash_times', 3))
+        self.daemon_max_thrash_period = int(self.config.get('daemon_max_thrash_period', 30 * 60)) # seconds
+
         self.min_thrash_delay = int(self.config.get('min_thrash_delay', 60))
         self.max_thrash_delay = int(self.config.get('max_thrash_delay', self.min_thrash_delay + 30))
         self.min_revive_delay = int(self.config.get('min_revive_delay', 60))
@@ -225,32 +231,19 @@ class NvmeofThrasher(Thrasher, Greenlet):
         self.stopping.set()
 
     def check_status(self):
-        self.log(f'display and verify stats before reviving')
+        self.log(f'display and verify stats:')
         check_cmd = [
-            'ceph', 'orch', 'ls'
+            'ceph', 'orch', 'ls',
+            run.Raw('&&'), 'ceph', 'health', 'detail',
+            run.Raw('&&'), 'ceph', '-s',
         ]
         for dev in self.devices:
             check_cmd += [
                 run.Raw('&&'), 'sudo', 'nvme', 'list-subsys', dev,
                 run.Raw('|'), 'grep', 'live optimized'
-            ]
-        
-        # funcs = []
-        # run.wait(
-        #     [self.checker_host.run(args="ceph orch ls")]
-        #     + [
-        #         self.checker_host.run(args=f"sudo nvme list-subsys {dev}")
-        #         for dev in self.devices
-        #     ]
-        # )
+            ] 
         self.checker_host.run(args=check_cmd).wait()
-        # if exitcode != 0:
-        #     raise Exception('failed verification')
-        # for dev in self.devices:
-        #     proc = self.checker_host.run(args=f'sudo nvme list-subsys {dev}', stdout=StringIO())
-        #     proc.wait()
-        #     output = proc.stdout.getvalue()
-        #     assert "live optimized" in output
+       
 
     def switch_task(self):
         "Pause nvmeof till other is set"
@@ -271,7 +264,7 @@ class NvmeofThrasher(Thrasher, Greenlet):
                  f'max revive delay: {self.max_revive_delay}, min revive delay: {self.min_revive_delay} '\
                  f'daemons: {len(self.daemons)} '\
                 )
-        thrash_count = {}
+        thrash_count = defaultdict(list)
 
         while not self.stopping.is_set():
             killed_daemons = []
@@ -284,19 +277,32 @@ class NvmeofThrasher(Thrasher, Greenlet):
                     self.log('skipping daemon {label} with skip ({skip}) > weight ({weight})'.format(
                         label=daemon.id_, skip=skip, weight=weight))
                     continue
-                if thrash_count.get(daemon.id_, 0) >= self.max_thrash_iters_each:
-                    self.log(f'skipping daemon {daemon.id_}: already thrashed {self.max_thrash_iters_each} times')
-                    continue
+
+                thrashed_history = thrash_count.get(daemon.id_, [])
+                history_ptr = len(thrashed_history) - self.daemon_max_thrash_times
+                if history_ptr >= 0: 
+                    ptr_timestamp = thrashed_history[history_ptr]
+                    current_timestamp = datetime.now()
+                    if (current_timestamp - ptr_timestamp).total_seconds() > self.daemon_max_thrash_period:
+                        self.log(f'skipping daemon {daemon.id_}: thrashed total {len(thrashed_history)} times, '\
+                                 f'can only thrash {self.daemon_max_thrash_times} times '\
+                                 f'in {self.daemon_max_thrash_period} seconds.')
+                        continue
+                
+                # if thrash_count.get(daemon.id_, 0) >= self.max_thrash_iters_each:
+                #     self.log(f'skipping daemon {daemon.id_}: already thrashed {self.max_thrash_iters_each} times')
+                #     continue
 
                 self.log('kill {label}'.format(label=daemon.id_))
                 daemon.stop()
 
                 killed_daemons.append(daemon)
-                thrash_count[daemon.id_] = thrash_count.get(daemon.id_, 0) + 1
+                thrash_count[daemon.id_] += [datetime.now()]
+                # thrash_count[daemon.id_] = thrash_count.get(daemon.id_, 0) + 1
 
                 # if we've reached max_thrash, we're done
                 count += 1
-                if count >= self.max_thrash:
+                if count >= self.max_thrash_daemons:
                     break
 
             if killed_daemons:  
@@ -315,7 +321,7 @@ class NvmeofThrasher(Thrasher, Greenlet):
                 # revive after thrashing
                 for daemon in killed_daemons:
                     self.log('reviving {label}'.format(label=daemon.id_))
-                    daemon.start()
+                    daemon.restart()
                 
                 # delay before thrashing
                 thrash_delay = self.min_thrash_delay

@@ -2,9 +2,10 @@
 
 sudo modprobe nvme-fabrics
 sudo modprobe nvme-tcp
-sudo dnf install nvme-cli -y
+sudo dnf reinstall nvme-cli -y
 sudo lsmod | grep nvme
 nvme version
+which nvme
 
 source /etc/ceph/nvmeof.env
 SPDK_CONTROLLER="Ceph bdev Controller"
