@@ -60,8 +60,10 @@ tasks:
 - nvmeof.thrash:
     checker_host: 'client.3'
     switch_thrashers: True
+    seed: 1713786733
 
 - mon_thrash:
+    seed: 1713786735
     revive_delay: 60
     thrash_delay: 60
     thrash_many: true
