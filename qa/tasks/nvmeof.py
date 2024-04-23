@@ -315,8 +315,9 @@ class NvmeofThrasher(Thrasher, Greenlet):
                 time.sleep(revive_delay) # blocking wait
                 self.log('reviving time.sleep over')
 
-                self.switch_task()
                 self.check_status()
+                self.switch_task()
+                
 
                 # revive after thrashing
                 for daemon in killed_daemons:
@@ -334,8 +335,8 @@ class NvmeofThrasher(Thrasher, Greenlet):
                     if self.stopping.is_set():
                         continue
 
-                self.switch_task() 
                 self.check_status()
+                self.switch_task()
         self.log(thrash_count)
 
 class ThrashTest(Nvmeof):

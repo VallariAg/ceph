@@ -24,6 +24,7 @@ roles:
 
 overrides:
   ceph:
+    # watchdog:
     log-ignorelist: 
       - MON_DOWN
       - mons down
@@ -61,6 +62,7 @@ tasks:
     checker_host: 'client.3'
     switch_thrashers: True
     seed: 1713786733
+    min_revive_delay: 300
 
 - mon_thrash:
     seed: 1713786735
