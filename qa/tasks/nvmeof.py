@@ -173,6 +173,71 @@ class Nvmeof(Task):
 
 
 class NvmeofThrasher(Thrasher, Greenlet):
+    """
+    How it works::
+
+    - pick a nvmeof daemon
+    - kill it
+    - wait for other thrashers to finish thrashing (if switch_thrashers True) 
+    - sleep for 'revive_delay' seconds
+    - do some checks after thrashing ('do_checks' method) 
+    - revive daemons
+    - wait for other thrashers to finish reviving (if switch_thrashers True)
+    - sleep for 'thrash_delay' seconds
+    - do some checks after reviving ('do_checks' method) 
+
+    
+    Options::
+
+    seed                Seed to use on the RNG to reproduce a previous
+                        behavior (default: None; i.e., not set) 
+    checker_host:       Initiator client on which verification tests would 
+                        run during thrashing (mandatory option)
+    switch_thrashers:   Toggle this to switch between thrashers so it waits until all
+                        thrashers are done thrashing before proceeding. And then
+                        wait until all thrashers are done reviving before proceeding.
+                        (default: false)          
+    randomize:          Enables randomization and use the max/min values. (default: true)
+    max_thrash:         Maximum number of daemons that can be thrashed at a time. 
+                        (default: num_of_daemons-1, minimum of 1 daemon should be up)
+    min_thrash_delay:   Minimum number of seconds to delay before thrashing again. 
+                        (default: 60)
+    max_thrash_delay:   Maximum number of seconds to delay before thrashing again. 
+                        (default: min_thrash_delay + 30)
+    min_revive_delay:   Minimum number of seconds to delay before bringing back a 
+                        thrashed daemon. (default: 100)
+    max_revive_delay:   Maximum number of seconds to delay before bringing back a 
+                        thrashed daemon. (default: min_revive_delay + 30)
+
+    daemon_max_thrash_times: 
+                        For now, NVMeoF daemons have limitation that each daemon can 
+                        be thrashed only 3 times in span of 30 mins. This option 
+                        allows to set the amount of times it could be thrashed in a period
+                        of time. (default: 3)
+    daemon_max_thrash_period: 
+                        This option goes with the above option. It sets the period of time
+                        over which each daemons can be thrashed for daemon_max_thrash_times
+                        amount of times. Time period in seconds. (default: 1800, i.e. 30mins)
+    
+
+    For example::
+    tasks:
+    - nvmeof.thrash:
+        checker_host: 'client.3'
+        switch_thrashers: True
+
+    - mon_thrash:
+        switch_thrashers: True
+
+    - workunit:
+        clients:
+            client.3:
+            - rbd/nvmeof_fio_test.sh --rbd_iostat
+        env:
+            RBD_POOL: mypool
+            IOSTAT_INTERVAL: '10'
+    
+    """
     def __init__(self, ctx, config, daemons) -> None:
         super(NvmeofThrasher, self).__init__()
 
@@ -225,11 +290,15 @@ class NvmeofThrasher(Thrasher, Greenlet):
             self.set_thrasher_exception(e)
             self.logger.exception("exception:")
             # allow successful completion so gevent doesn't see an exception...
+            # The DaemonWatchdog will observe the error and tear down the test.
     
     def stop(self):
         self.stopping.set()
 
-    def check_status(self):
+    def do_checks(self):
+        """
+        Run some checks to see if everything is running well during thrashing.
+        """
         self.log(f'display and verify stats:')
         for d in self.daemons:
             d.remote.sh(d.status_cmd, check_status=False)
@@ -244,11 +313,16 @@ class NvmeofThrasher(Thrasher, Greenlet):
                 run.Raw('&&'), 'sudo', 'nvme', 'list-subsys', dev,
                 run.Raw('|'), 'grep', 'live optimized'
             ] 
-        self.checker_host.run(args=check_cmd).wait()
-       
+        self.checker_host.run(args=check_cmd).wait()        
 
     def switch_task(self):
-        "Pause nvmeof till other is set"
+        """
+        Pause nvmeof thrasher till other thrashers are done with their iteration.
+        This method would help to sync between multiple thrashers, like:
+        1. thrasher-1 and thrasher-2: thrash daemons in parallel
+        2. thrasher-1 and thrasher-2: revive daemons in parallel 
+        This allows us to run some checks after each thrashing and reviving iteration.
+        """
         if not hasattr(self, 'is_done'):
             return
         self.is_done.set()
@@ -259,7 +333,7 @@ class NvmeofThrasher(Thrasher, Greenlet):
                 (isinstance(t.stopping, Event) and not t.stopping.is_set())
             ):
                 other_thrasher = t
-                other_thrasher.is_done.wait()
+                other_thrasher.is_done.wait(300)
                 other_thrasher.is_done.clear()
 
     def do_thrash(self):
@@ -269,7 +343,8 @@ class NvmeofThrasher(Thrasher, Greenlet):
                  f'max revive delay: {self.max_revive_delay}, min revive delay: {self.min_revive_delay} '\
                  f'daemons: {len(self.daemons)} '\
                 )
-        thrash_count = defaultdict(list)
+        daemons_thrash_history = defaultdict(list)
+        summary = []
 
         while not self.stopping.is_set():
             killed_daemons = []
@@ -283,7 +358,10 @@ class NvmeofThrasher(Thrasher, Greenlet):
                         label=daemon.id_, skip=skip, weight=weight))
                     continue
 
-                thrashed_history = thrash_count.get(daemon.id_, [])
+                # For now, nvmeof daemons can only be thrashed 3 times in last 30mins. 
+                # Skip thrashing if daemon was thrashed <daemon_max_thrash_times> 
+                # times in last <daemon_max_thrash_period> seconds. 
+                thrashed_history = daemons_thrash_history.get(daemon.id_, [])
                 history_ptr = len(thrashed_history) - self.daemon_max_thrash_times
                 if history_ptr >= 0: 
                     ptr_timestamp = thrashed_history[history_ptr]
@@ -298,14 +376,15 @@ class NvmeofThrasher(Thrasher, Greenlet):
                 daemon.stop()
 
                 killed_daemons.append(daemon)
-                thrash_count[daemon.id_] += [datetime.now()]
+                daemons_thrash_history[daemon.id_] += [datetime.now()]
 
-                # if we've reached max_thrash, we're done
+                # only thrash max_thrash_daemons amount of daemons
                 count += 1
                 if count >= self.max_thrash_daemons:
                     break
 
-            if killed_daemons:  
+            if killed_daemons:
+                summary += ["killed: " + ", ".join([d.id_ for d in killed_daemons])]
                 # delay before reviving
                 revive_delay = self.min_revive_delay
                 if self.randomize:
@@ -315,7 +394,7 @@ class NvmeofThrasher(Thrasher, Greenlet):
                 time.sleep(revive_delay) # blocking wait
                 self.log('done waiting before reviving')
 
-                self.check_status()
+                self.do_checks()
                 self.switch_task()
 
                 # revive after thrashing
@@ -332,9 +411,13 @@ class NvmeofThrasher(Thrasher, Greenlet):
                     time.sleep(thrash_delay) # blocking
                     self.log('done waiting before thrashing')
 
-                self.check_status()
-                self.switch_task() 
-        self.log(thrash_count)
+                self.do_checks()
+                self.switch_task()
+        self.log("Thrasher summary: ")
+        for daemon in daemons_thrash_history:
+            self.log(f'{daemon} was thrashed {len(daemons_thrash_history[daemon])} times')
+        for index, string in enumerate(summary):
+            self.log(f"Iteration {index}: {string}")
 
 class ThrashTest(Nvmeof):
     name = 'nvmeof.thrash'

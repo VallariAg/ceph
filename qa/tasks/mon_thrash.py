@@ -44,6 +44,10 @@ class MonitorThrasher(Thrasher):
                         the monitor (default: 10)
     thrash_delay        Number of seconds to wait in-between
                         test iterations (default: 0)
+    switch_thrashers:   Toggle this to switch between thrashers so it waits until all
+                        thrashers are done thrashing before proceeding. And then
+                        wait until all thrashers are done reviving before proceeding.
+                        (default: false) 
     store_thrash        Thrash monitor store before killing the monitor being thrashed (default: False)
     store_thrash_probability  Probability of thrashing a monitor's store
                               (default: 50)
@@ -261,7 +265,13 @@ class MonitorThrasher(Thrasher):
             # The DaemonWatchdog will observe the error and tear down the test.
 
     def switch_task(self):
-        "Pause monthrash until other thrasher's do their tharshing and unpause it"
+        """
+        Pause mon thrasher till other thrashers are done with their iteration.
+        This would help to sync between multiple thrashers, like:
+        1. thrasher-1 and thrasher-2: thrash daemons in parallel
+        2. thrasher-1 and thrasher-2: revive daemons in parallel 
+        This allows us to run some checks after each thrashing and reviving iteration.
+        """
         if not hasattr(self, 'is_done'):
             return
         self.is_done.set()
@@ -272,7 +282,7 @@ class MonitorThrasher(Thrasher):
                 (isinstance(t.stopping, Event) and not t.stopping.is_set())
             ):
                 other_thrasher = t
-                other_thrasher.is_done.wait()
+                other_thrasher.is_done.wait(300)
                 other_thrasher.is_done.clear()
 
     def _do_thrash(self):
