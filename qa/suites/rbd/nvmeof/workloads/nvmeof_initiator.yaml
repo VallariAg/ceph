@@ -1,13 +1,13 @@
 tasks:
 - nvmeof:
     client: client.0
-    version: default  # "default" is the image cephadm defaults to; change to test specific nvmeof images, example "latest"
+    version: "1.2.5"  # "default" is the image cephadm defaults to; change to test specific nvmeof images, example "latest"
     rbd:
       pool_name: mypool
       image_name_prefix: myimage
     gateway_config:
       namespaces_count: 128
-      cli_version: latest
+      cli_version: "1.2.5"
 
 - cephadm.wait_for_service:
     service: nvmeof.mypool
