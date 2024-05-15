@@ -1066,6 +1066,11 @@ def ceph_osds(ctx, config):
             _, _, id_ = teuthology.split_role(osd)
             assert int(id_) == cur
             devs = devs_by_remote[remote]
+            log.info(id_to_remote)
+            log.info(devs_by_remote)
+            log.info(remote)
+            log.info(devs)
+            log.info(osd_id)
             assert devs   ## FIXME ##
             dev = devs.pop()
             if all(_ in dev for _ in ('lv', 'vg')):
