@@ -62,6 +62,7 @@ test_run() {
     fi
 }
 
+ceph orch ls nvmeof --export
 
 test_run disconnect_all
 test_run discovery 
