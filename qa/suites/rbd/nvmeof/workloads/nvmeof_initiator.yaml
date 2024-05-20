@@ -22,7 +22,7 @@ tasks:
       pool_name: mypool
       image_name_prefix: myimage
     gateway_config:
-      subsystems_count: 3
+      subsystems_count: 1
       namespaces_count: 20
       cli_image: quay.io/ceph/nvmeof-cli:1.2.5
 
