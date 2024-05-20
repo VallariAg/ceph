@@ -17,14 +17,14 @@ roles:
 tasks:
 - nvmeof:
     client: client.0
-    gw_image: quay.io/ceph/nvmeof:1.2.7 # "default" is the image cephadm defaults to; change to test specific nvmeof images, example "latest"
+    gw_image: quay.io/ceph/nvmeof:1.2.5 # "default" is the image cephadm defaults to; change to test specific nvmeof images, example "latest"
     rbd:
       pool_name: mypool
       image_name_prefix: myimage
     gateway_config:
       subsystems_count: 3
       namespaces_count: 20
-      cli_image: quay.io/ceph/nvmeof-cli:1.2.7
+      cli_image: quay.io/ceph/nvmeof-cli:1.2.5
 
 - cephadm.wait_for_service:
     service: nvmeof.mypool
