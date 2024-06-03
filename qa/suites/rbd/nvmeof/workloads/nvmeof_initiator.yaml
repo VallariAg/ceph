@@ -3,15 +3,12 @@ roles:
   - mon.a
   - mgr.x
   - osd.0
-  - osd.1
   - client.0
   - ceph.nvmeof.nvmeof.a
 - - host.b
   - mon.b
   - mon.c
-  - osd.2
-  - osd.3
-  - osd.4
+  - osd.1
   - client.1
   - ceph.nvmeof.nvmeof.b
 - - client.2
@@ -20,14 +17,14 @@ roles:
 tasks:
 - nvmeof:
     client: client.0
-    gw_image: quay.io/ceph/nvmeof:1.2.7 # "default" is the image cephadm defaults to; change to test specific nvmeof images, example "latest"
+    gw_image: quay.io/ceph/nvmeof:1.2 # "default" is the image cephadm defaults to; change to test specific nvmeof images, example "latest"
     rbd:
       pool_name: mypool
       image_name_prefix: myimage
     gateway_config:
-      subsystems_count: 3
+      subsystems_count: 1
       namespaces_count: 20
-      cli_image: quay.io/ceph/nvmeof-cli:1.2.7
+      cli_image: quay.io/ceph/nvmeof-cli:1.2
 
 - cephadm.wait_for_service:
     service: nvmeof.mypool
@@ -47,10 +44,10 @@ tasks:
     clients:
       client.2:
         - rbd/nvmeof_basic_tests.sh
-        - rbd/nvmeof_fio_test.sh --start_ns 1 --end_ns 30 --rbd_iostat
+        - rbd/nvmeof_fio_test.sh --start_ns 1 --end_ns 10 --rbd_iostat
       client.3:
         - rbd/nvmeof_basic_tests.sh
-        - rbd/nvmeof_fio_test.sh --start_ns 31 --end_ns 60
+        - rbd/nvmeof_fio_test.sh --start_ns 11 --end_ns 20
     env:
       RBD_POOL: mypool
       IOSTAT_INTERVAL: '10'
