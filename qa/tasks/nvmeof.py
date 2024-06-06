@@ -1,9 +1,7 @@
 import logging
 import random
 import time
-import gevent
 from collections import defaultdict
-from io import StringIO
 from datetime import datetime
 from textwrap import dedent
 from gevent.event import Event
@@ -299,7 +297,7 @@ class NvmeofThrasher(Thrasher, Greenlet):
         """
         Run some checks to see if everything is running well during thrashing.
         """
-        self.log(f'display and verify stats:')
+        self.log('display and verify stats:')
         for d in self.daemons:
             d.remote.sh(d.status_cmd, check_status=False)
         check_cmd = [
