@@ -69,9 +69,9 @@ class CephNvmeof(ContainerDaemonForm):
         mounts = dict()
         mounts[os.path.join(data_dir, 'config')] = '/etc/ceph/ceph.conf:z'
         mounts[os.path.join(data_dir, 'keyring')] = '/etc/ceph/keyring:z'
-        mounts[os.path.join(data_dir, 'ceph-nvmeof.conf')] = (
-            '/src/ceph-nvmeof.conf:z'
-        )
+        mounts[
+            os.path.join(data_dir, 'ceph-nvmeof.conf')
+        ] = '/src/ceph-nvmeof.conf:z'
         mounts[os.path.join(data_dir, 'configfs')] = '/sys/kernel/config'
         mounts['/dev/hugepages'] = '/dev/hugepages'
         mounts['/dev/vfio/vfio'] = '/dev/vfio/vfio'
