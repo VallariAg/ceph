@@ -3,6 +3,9 @@ tasks:
 - cephadm:
 - cephadm.shell:
     host.a:
+    - ceph status
+    - ceph service dump
+    - ceph service status
     - ceph orch status
     - ceph orch ps
     - ceph orch ls

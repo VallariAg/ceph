@@ -1,6 +1,16 @@
 tasks:
 - ceph_iscsi_client:
     clients: [client.1]
+- cephadm.shell:
+    host.a:
+    - ceph status
+    - ceph service dump
+    - ceph service status
+    - ceph orch status
+    - ceph orch ps
+    - ceph orch ls
+    - ceph orch host ls
+    - ceph orch device ls
 - cram:
     parallel: False
     clients:
@@ -10,6 +20,16 @@ tasks:
       - src/test/cli-integration/rbd/iscsi_client.t
       client.2:
       - src/test/cli-integration/rbd/gwcli_delete.t
+- cephadm.shell:
+    host.a:
+    - ceph status
+    - ceph service dump
+    - ceph service status
+    - ceph orch status
+    - ceph orch ps
+    - ceph orch ls
+    - ceph orch host ls
+    - ceph orch device ls
 - cram:
     parallel: False
     clients:
@@ -19,3 +39,13 @@ tasks:
       - src/test/cli-integration/rbd/iscsi_client.t
       client.2:
       - src/test/cli-integration/rbd/rest_api_delete.t
+- cephadm.shell:
+    host.a:
+    - ceph status
+    - ceph service dump
+    - ceph service status
+    - ceph orch status
+    - ceph orch ps
+    - ceph orch ls
+    - ceph orch host ls
+    - ceph orch device ls
