@@ -22,6 +22,15 @@ tasks:
       - ceph config set mon mon_warn_on_insecure_global_id_reclaim false --force
       - ceph config set mon mon_warn_on_insecure_global_id_reclaim_allowed false --force
       - ceph config set global log_to_journald false --force
+      # setup nvmeof
+      - ceph config get mgr mgr/cephadm/container_image_nvmeof
+      - ceph osd pool create mypool
+      - rbd pool init -p mypool
+      - ceph orch apply nvmeof mypool
+      - ceph orch ls
+      - sleep 60
+      - rbd create mypool/myimage --size 8Gi
+      - rbd ls mypool
       # get some good info on the state of things pre-upgrade. Useful for debugging
       - ceph orch ps
       - ceph versions
@@ -136,3 +145,9 @@ tasks:
       - ceph health detail
       # run upgrade one more time with no filter parameters to make sure anything left gets upgraded
       - ceph orch upgrade start --image quay.ceph.io/ceph-ci/ceph:$sha1
+      # check after upgrade
+      - ceph orch upgrade status
+      - ceph health detail
+      - ceph versions
+      - ceph config get mgr mgr/cephadm/container_image_nvmeof
+      - ceph orch ps
