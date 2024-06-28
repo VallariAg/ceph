@@ -373,6 +373,7 @@ class NvmeofThrasher(Thrasher, Greenlet):
 
                 self.log('kill {label}'.format(label=daemon.id_))
                 daemon.stop()
+                assert 1 == 2
 
                 killed_daemons.append(daemon)
                 daemons_thrash_history[daemon.id_] += [datetime.now()]
