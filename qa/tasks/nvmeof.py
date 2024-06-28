@@ -400,6 +400,7 @@ class NvmeofThrasher(Thrasher, Greenlet):
                 for daemon in killed_daemons:
                     self.log('reviving {label}'.format(label=daemon.id_))
                     daemon.restart()
+                    assert 1 == 2
                 
                 # delay before thrashing
                 thrash_delay = self.min_thrash_delay
