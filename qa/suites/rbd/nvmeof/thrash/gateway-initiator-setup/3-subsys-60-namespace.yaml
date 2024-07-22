@@ -10,8 +10,28 @@ tasks:
       namespaces_count: 20 # each subsystem
       cli_image: quay.io/ceph/nvmeof-cli:1.2
 
+- cephadm.shell:
+    host.a:
+    # get state before nvmeof deployment
+    - ceph nvme-gw show mypool
+    - ceph orch status
+    - ceph orch ps
+    - ceph orch host ls
+    - ceph orch device ls
+    - ceph osd lspools
+
 - cephadm.wait_for_service:
     service: nvmeof.mypool
+
+- cephadm.shell:
+    host.a:
+    # get state before nvmeof deployment
+    - ceph nvme-gw show mypool
+    - ceph orch status
+    - ceph orch ps
+    - ceph orch host ls
+    - ceph orch device ls
+    - ceph osd lspools
 
 - workunit:
     no_coverage_and_limits: true
