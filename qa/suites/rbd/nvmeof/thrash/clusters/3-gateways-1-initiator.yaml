@@ -23,8 +23,10 @@ roles:
 - - client.3 # initiator
 
 overrides:
-  ceph:
+  ceph: 
     conf:
       mon:
         # cephadm can take up to 5 minutes to bring up remaining mons
         mon down mkfs grace: 300
+      global:
+        mon_nvmeofgw_in_service: true
