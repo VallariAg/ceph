@@ -1392,9 +1392,9 @@ def watchdog_setup(ctx, config):
         ctx.ceph[config['cluster']].thrashers = []
         ctx.ceph[config['cluster']].watchdog = DaemonWatchdog(ctx, config, ctx.ceph[config['cluster']].thrashers)
         ctx.ceph[config['cluster']].watchdog.start()
-        yield
     else:
         ctx.ceph[config['cluster']].watchdog = None 
+    yield
 
 @contextlib.contextmanager
 def ceph_initial():
