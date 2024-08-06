@@ -106,6 +106,10 @@ tasks:
       # verify two different versions now seen for osds
       - ceph versions | jq -e '.osd | length == 2'
       # verify exactly 7 daemons have been upgraded (2 mgrs, 3 mons, 2 osds)
+      - ceph orch upgrade check quay.ceph.io/ceph-ci/ceph:$sha1
+      - ceph orch upgrade status
+      - ceph health detail 
+      - ceph versions
       - ceph orch upgrade check quay.ceph.io/ceph-ci/ceph:$sha1 | jq -e '.up_to_date | length == 7'
       - ceph orch upgrade status
       - ceph health detail
