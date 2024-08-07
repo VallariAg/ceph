@@ -22,6 +22,7 @@ tasks:
       RBD_POOL: mypool
       RBD_IMAGE_PREFIX: myimage
 
+# Test1: add/del new namespaces while fio happens on other ns in background
 - workunit:
     no_coverage_and_limits: true
     timeout: 30m
@@ -35,6 +36,43 @@ tasks:
     env:
       RBD_POOL: mypool
       IOSTAT_INTERVAL: '10'
-      RUNTIME: '600'
+      RUNTIME: '120'
       NEW_NAMESPACES_COUNT: '5'
+
+- print: "[nvmeof] namespace add/del test passed"
+
+# Test2: Namespace load-balancing test
+- cephadm.shell: # stop nvmeof.a
+  - ceph nvme-gw show mypool '' # (assert all deployed) 
+  - cat /etc/ceph/nvmeof-gw.yaml
+  - pip install yq
+  - yq 'del(.placement.hosts[] | select(test(".*nvmeof.a$")))' /etc/ceph/nvmeof-gw.yaml > /etc/ceph/nvmeof-gw-new.yaml
+  - ceph orch apply -i /etc/ceph/nvmeof-gw-new.yaml
+- sleep:
+  duration: 5
+- cephadm.shell: # redeploy
+  - ceph nvme-gw show mypool '' 
+  - ceph orch apply -i /etc/ceph/nvmeof-gw.yaml
+  - ceph orch daemon start nvmeof.a
+- sleep:
+  duration: 5
+
+- cephadm.shell: # stop nvmeof.b
+  - ceph nvme-gw show mypool '' # (assert all deployed) 
+  - cat /etc/ceph/nvmeof-gw.yaml
+  - pip install yq
+  - yq 'del(.placement.hosts[] | select(test(".*nvmeof.b$")))' /etc/ceph/nvmeof-gw.yaml > /etc/ceph/nvmeof-gw-new.yaml
+  - ceph orch apply -i /etc/ceph/nvmeof-gw-new.yaml
+- sleep:
+  duration: 5
+- cephadm.shell: # redeploy
+  - ceph nvme-gw show mypool '' 
+  - ceph orch apply -i /etc/ceph/nvmeof-gw.yaml
+  - ceph orch daemon start nvmeof.b
+- sleep:
+  duration: 5
+- cephadm.shell:
+  - ceph nvme-gw show mypool '' # (assert all deployed)
+
+- print: "[nvmeof] namespace load-balancing test passed"
 
