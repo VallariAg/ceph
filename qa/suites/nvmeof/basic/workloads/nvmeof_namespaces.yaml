@@ -42,9 +42,11 @@ tasks:
 - print: "[nvmeof] namespace add/del test passed"
 
 # Test2: Namespace load-balancing test
-- cephadm.shell: # stop nvmeof.a
-    host.a:
+- exec:
+    client.0:
+    - ls /etc/ceph/ 
     - ceph orch ls nvmeof --export > /etc/ceph/nvmeof-gw.yaml
+    - ls /etc/ceph/ 
     - ceph nvme-gw show mypool '' # (assert all deployed) 
     - cat /etc/ceph/nvmeof-gw.yaml
     - pip install yq
@@ -58,8 +60,8 @@ tasks:
     - sleep 50
     - ceph nvme-gw show mypool '' # (assert all deployed)  
 
-- cephadm.shell: # stop nvmeof.b
-    host.a:
+- exec: # stop nvmeof.b
+    client.0:
     - cat /etc/ceph/nvmeof-gw.yaml
     - pip install yq
     - yq 'del(.placement.hosts[] | select(test(".*nvmeof.b$")))' /etc/ceph/nvmeof-gw.yaml > /etc/ceph/nvmeof-gw-new.yaml
