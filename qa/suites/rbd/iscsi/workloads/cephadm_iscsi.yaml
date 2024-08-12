@@ -8,14 +8,37 @@ tasks:
       - src/test/cli-integration/rbd/gwcli_create.t
       client.1:
       - src/test/cli-integration/rbd/iscsi_client.t
-      client.2:
-      - src/test/cli-integration/rbd/gwcli_delete.t
+
+- cephadm.shell:
+    host.a:
+    - ceph -s
+    - ceph orch status
+    - ceph orch ps
+    - ceph orch ls
+    - sleep 30
+    - ceph -s
+
 - cram:
     parallel: False
     clients:
+      client.2:
+      - src/test/cli-integration/rbd/gwcli_delete.t
       client.0:
       - src/test/cli-integration/rbd/rest_api_create.t
       client.1:
       - src/test/cli-integration/rbd/iscsi_client.t
+
+- cephadm.shell:
+    host.a:
+    - ceph -s
+    - ceph orch status
+    - ceph orch ps
+    - ceph orch ls
+    - sleep 30
+    - ceph -s
+
+- cram:
+    parallel: False
+    clients:
       client.2:
       - src/test/cli-integration/rbd/rest_api_delete.t
