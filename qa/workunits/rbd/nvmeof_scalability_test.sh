@@ -11,25 +11,28 @@ fi
 
 pip3 install yq
 
-# downscaling (remove $GATEWAYS)
-echo "[nvmeof] Removing ${GATEWAYS}"
+status_checks() {
+    ceph nvme-gw show mypool '' # (assert all deployed)
+    ceph orch ls
+    ceph orch ps 
+}
+
+
+echo "[nvmeof.scale] Setting up config to remove gateways ${GATEWAYS}"
 ceph orch ls nvmeof --export > /tmp/nvmeof-gw.yaml
-ls /tmp/nvmeof-gw.yaml
-ceph nvme-gw show mypool '' # (assert all deployed) 
 cat /tmp/nvmeof-gw.yaml
 yq "del(.placement.hosts[] | select(. | test(\".*($(echo $GATEWAYS | sed 's/,/|/g'))\")))" /tmp/nvmeof-gw.yaml > /tmp/nvmeof-gw-new.yaml
+cat /tmp/nvmeof-gw-new.yaml
+
+echo "[nvmeof.scale] Starting scale testing by removing ${GATEWAYS}"
+# downscaling (remove $GATEWAYS)
+status_checks # (assert all deployed)
 ceph orch apply -i /tmp/nvmeof-gw-new.yaml
 sleep $DELAY
-
 # upscaling (bring up all originally deployed daemons)
-ceph nvme-gw show mypool '' 
-ceph orch ls
-ceph orch ps
+status_checks
 ceph orch apply -i /tmp/nvmeof-gw.yaml 
-# ceph orch daemon start nvmeof.a
 sleep $DELAY
-ceph nvme-gw show mypool '' # (assert all deployed)  
-ceph orch ls
-ceph orch ps
+status_checks # (assert all deployed)  
 
-echo "[nvmeof] scalability test passed for ${GATEWAYS}"
+echo "[nvmeof.scale] Scale testing passed for ${GATEWAYS}"
