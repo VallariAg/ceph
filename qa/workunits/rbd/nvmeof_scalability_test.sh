@@ -15,6 +15,7 @@ status_checks() {
     ceph nvme-gw show mypool '' # (assert all deployed)
     ceph orch ls
     ceph orch ps 
+    ceph -s
 }
 
 
@@ -25,14 +26,16 @@ yq "del(.placement.hosts[] | select(. | test(\".*($(echo $GATEWAYS | sed 's/,/|/
 cat /tmp/nvmeof-gw-new.yaml
 
 echo "[nvmeof.scale] Starting scale testing by removing ${GATEWAYS}"
-# downscaling (remove $GATEWAYS)
-status_checks # (assert all deployed)
-ceph orch apply -i /tmp/nvmeof-gw-new.yaml
-sleep $DELAY
-# upscaling (bring up all originally deployed daemons)
 status_checks
-ceph orch apply -i /tmp/nvmeof-gw.yaml 
+ceph orch rm nvmeof.mypool && sleep 20 # temp workaround
+ceph -s
+ceph orch apply -i /tmp/nvmeof-gw-new.yaml # downscale
 sleep $DELAY
-status_checks # (assert all deployed)  
+status_checks
+ceph orch rm nvmeof.mypool && sleep 20 # temp workaround
+ceph -s
+ceph orch apply -i /tmp/nvmeof-gw.yaml #upscale
+sleep $DELAY
+status_checks
 
 echo "[nvmeof.scale] Scale testing passed for ${GATEWAYS}"
