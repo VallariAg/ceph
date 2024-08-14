@@ -16,6 +16,7 @@ status_checks() {
     ceph orch ls
     ceph orch ps 
     ceph -s
+    ceph service dump
 }
 
 
