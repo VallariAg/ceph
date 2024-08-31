@@ -3,11 +3,44 @@
 Integration Tests using Teuthology Workflow
 ===========================================
 
-Scheduling Test Run
--------------------
+Infrastructure
+--------------
 
-Getting binaries
-****************
+Components:
+
+1. `ceph-ci`_: Clone of main ceph repository, used for triggering jenkins ceph builds for development.
+2. `ceph_jenkins`_: It is responsible for triggering build, uploading packages to Chacra, and pushing updates about the build to Shaman.
+3. `Shaman`_: UI Interface used to check build statuses. In it's backend, it is a REST API that talks to jenkins.
+4. `Chacra`_: Service where packages are uploaded. The binaries uploaded here can be downloaded and used by anyone.
+5. Teuthology CLI: Developers can use various teuthology commands to schedule and manage test runs. 
+6. Teuthology: This is the component responsible for pushing test jobs to beanstalk queue and 
+   paddles. It is also responsible for picking jobs from queue and running tests. Developers usually don't interact with it. 
+7. Beanstalk queue: A priority queue with all the queued jobs. Developers usually don't interact with it. 
+8. Paddles: Backend service which stores all test run information. Developers usually don't need to interact with it.
+9.  `Pulpito`_: UI Interface (of information stored on paddles) used by developers to see full information about their scheduled tests, 
+   along with it's status and results. 
+10. Testnodes (`smithi`_): A cluster of various types of machines that are used for running tests.
+   Developers usually schedule tests to be run on "smithi" machines which are dedicated test nodes for teuthology integration testing.
+
+Each teuthology test *run* contains multiple test *jobs*. Each job runs in an environment isolated from other jobs, on a different collection of test nodes.
+
+
+To test a change in ceph, follow:
+1. Getting binaries - Build Ceph
+2. Scheduling Test Run
+   2.a  About Test Suites
+   2.a. Triggering Teuthology Tests
+   2.b. Testing QA changes (without re-building binaries)
+   2.c. Filter Tests
+3. Viewing Test Results
+   3.a. Pulpito Dashboard
+   3.b. Teuthology Archives (Logs)
+4. Killing tests 
+5. Re-running tests
+
+
+Getting binaries - Build Ceph
+-----------------------------
 
 Ceph binaries must be built for your branch before you can use teuthology to run integration tests on them. Follow these steps to build the Ceph binaries:
 
@@ -41,8 +74,46 @@ Ceph binaries must be built for your branch before you can use teuthology to run
 .. _the Chacra site: https://shaman.ceph.com/api/search/?status=ready&project=ceph
 
 
-Triggering Tests
-****************
+Naming the ceph-ci branch
+*************************
+Prepend your branch with your name before you push it to ceph-ci. For example,
+a branch named ``feature-x`` should be named ``wip-$yourname-feature-x``, where
+``$yourname`` is replaced with your name. Identifying your branch with your
+name makes your branch easily findable on Shaman and Pulpito.
+
+If you are using one of the stable branches (`quincy`, `pacific`, etc.), include
+the name of that stable branch in your ceph-ci branch name.
+For example, the ``feature-x`` PR branch should be named 
+``wip-feature-x-nautilus``. *This is not just a convention. This ensures that your branch is built in the correct environment.*
+
+You can choose to only trigger a CentOS 9.Stream build (excluding other distro like ubuntu)
+by adding "centos9-only" at the end of the ceph-ci branch name. For example,
+``wip-$yourname-feature-centos9-only``. This helps to get quicker builds and save resources 
+when you don't require binaries for other distros. 
+
+Delete the branch from ceph-ci when you no longer need it. If you are
+logged in to GitHub, all your branches on ceph-ci can be found here:
+https://github.com/ceph/ceph-ci/branches.
+
+
+.. _scheduling_test_run:
+
+Scheduling Test Run
+-------------------
+
+About Test Suites 
+*****************
+
+Integration tests are organized into “suites”, which are defined in ``qa/suites``
+sub-directory of the Ceph repository. These test suites can be run with the teuthology-suite 
+command. 
+
+See `Suites Inventory`_ for a list of available suites of integration tests.
+
+More details understanding of how these test suites are defined can be found on `Integration Test Introduction Page`_.
+
+Triggering Teuthology Tests
+***************************
 
 After you have built Ceph binaries for your branch, you can run tests using
 teuthology. This procedure explains how to run tests using teuthology.
@@ -54,7 +125,10 @@ teuthology. This procedure explains how to run tests using teuthology.
        ssh <username>@teuthology.front.sepia.ceph.com
 
    This requires Sepia lab access. To request access to the Sepia lab, see:
-   https://ceph.github.io/sepia/adding_users/
+   https://ceph.github.io/sepia/adding_users/.
+
+#. For initial setup, follow `teuthology installation guide`_ to setup teuthology for 
+   your user on teuthology machine. This will enable you to run teuthology commands. 
 
 #. Run the ``teuthology-suite`` command:
 
@@ -101,10 +175,13 @@ teuthology. This procedure explains how to run tests using teuthology.
    `Pulpito`_ where the test results can be viewed.
 
 
+The ``--dry-run`` option allows you to demo-run ``teuthology-suite`` command without 
+actually scheduling teuthology tests. This is helpful to check how many jobs and which jobs
+a command will schedule. 
 
 Other frequently used/useful options are ``-d`` (or ``--distro``),
-``--distroversion``, ``--filter-out``, ``--timeout``, ``flavor``, ``-rerun``,
-``-l`` (for limiting number of jobs) , ``-N`` (for how many times the job will
+``--distro-version``, ``--filter-out``, ``--timeout``, ``flavor``, ``-rerun``,
+``--limit`` (for limiting number of jobs) , ``-N`` (for how many times the job will
 run), and ``--subset`` (used to reduce the number of tests that are triggered). Run
 ``teuthology-suite --help`` to read descriptions of these and other options.
 
@@ -159,15 +236,15 @@ job config printed at the beginning of the teuthology job.
           for the builds to finish, then triggering tests and waiting for 
           the test results. 
 
-About Suites and Filters
-************************
+Filtering Tests
+***************
 
-See `Suites Inventory`_ for a list of available suites of integration tests.
-Each directory under ``qa/suites`` in the Ceph repository is an integration
-test suite, and arguments appropriate to follow ``-s`` can be found there.
-
+Test suites includes combinations of many yaml files which can results in massive 
+amount of jobs being scheduled for a suite. So filter can help to schedule particular 
+jobs within a suite.
+ 
 Keywords for filtering tests can be found in
-``qa/suites/<suite-name>/<subsuite-name>/tasks`` and can be used as arguments
+``qa/suites/<suite-name>/<subsuite-name>/tasks`` in ceph repository and can be used as arguments
 for ``--filter``. Each YAML file in that directory can trigger tests; using the
 name of the file without its filename extension as an argument to the
 ``--filter`` triggers those tests. 
@@ -182,6 +259,8 @@ contents of the file for the ``modules`` attribute. For ``cephfs-shell.yaml``
 the ``modules`` attribute is ``tasks.cephfs.test_cephfs_shell``. This means
 that it triggers all tests in ``qa/tasks/cephfs/test_cephfs_shell.py``.
 
+Read more about how to `Filter Tests by their Description`_.
+
 Viewing Test Results
 ---------------------
 
@@ -195,22 +274,26 @@ Teuthology Archives
 *******************
 
 After the tests have finished running, the log for the job can be obtained by
-clicking on the job ID at the Pulpito page associated with your tests. It's
+clicking on the job ID at the Pulpito run page associated with your tests. It's
 more convenient to download the log and then view it rather than viewing it in
-an internet browser since these logs can easily be up to 1 GB in size. It is
-easier to ssh into the teuthology machine (``teuthology.front.sepia.ceph.com``)
-and access the following path::
+an internet browser since these logs can easily be up to 1 GB in size.
+It is also possible to ssh into a `developer playground machine`_ and access the following path::
 
-    /ceph/teuthology-archive/<test-id>/<job-id>/teuthology.log
+    /teuthology/<run-name>/<job-id>/teuthology.log
 
 For example: for the above test ID, the path is::
 
-   /ceph/teuthology-archive/teuthology-2019-12-10_05:00:03-smoke-master-testing-basic-smithi/4588482/teuthology.log
+   /teuthology/teuthology-2019-12-10_05:00:03-smoke-master-testing-basic-smithi/4588482/teuthology.log
 
 This method can be used to view the log more quickly than would be possible through a browser.
 
-In addition to ``teuthology.log``, some other files are included for debugging
-purposes:
+To view ceph logs (cephadm, ceph monitors, ceph-mgr, etc) or system logs,
+remove ``teuthology.log`` from the job's teuthology log url on browser and then navigate 
+to ``remote/<machine>/log/``. System logs can be found at ``remote/<machine>/syslog/``.
+Similarly, these logs can be found on developer playground machines at 
+``/teuthology/<test-id>/<job-id>/remote/<machine>/log/``. 
+
+Some other files that are included for debugging purposes:
 
 * ``unit_test_summary.yaml``: Provides a summary of all unit test failures.
   Generated (optionally) when the ``unit_test_scan`` configuration option is
@@ -234,9 +317,9 @@ Here is the command that terminates jobs:
 
 .. prompt:: bash $
 
-   teuthology-kill -r teuthology-2019-12-10_05:00:03-smoke-master-testing-basic-smithi
+   teuthology-kill -p  -r teuthology-2019-12-10_05:00:03-smoke-master-testing-basic-smithi -m smithi -o scheduled_teuthology@teuthology 
 
-Let's call the argument passed to ``-r`` as test ID. It can be found
+The argument passed to ``-r`` is run name. It can be found
 easily in the link to the Pulpito page for the tests you triggered. For
 example, for the above test ID, the link is - http://pulpito.front.sepia.ceph.com/teuthology-2019-12-10_05:00:03-smoke-master-testing-basic-smithi/
 
@@ -275,23 +358,8 @@ Following's the definition of new options introduced in this section:
                                 'waiting'. Default value: 'fail,dead'
       =======================  ===============================================
 
-Naming the ceph-ci branch
--------------------------
-Prepend your branch with your name before you push it to ceph-ci. For example,
-a branch named ``feature-x`` should be named ``wip-$yourname-feature-x``, where
-``$yourname`` is replaced with your name. Identifying your branch with your
-name makes your branch easily findable on Shaman and Pulpito.
-
-If you are using one of the stable branches (`quincy`, `pacific`, etc.), include
-the name of that stable branch in your ceph-ci branch name.
-For example, the ``feature-x`` PR branch should be named 
-``wip-feature-x-nautilus``. *This is not just a convention. This ensures that your branch is built in the correct environment.*
-
-Delete the branch from ceph-ci when you no longer need it. If you are
-logged in to GitHub, all your branches on ceph-ci can be found here:
-https://github.com/ceph/ceph-ci/branches.
-
 .. _ceph-ci: https://github.com/ceph/ceph-ci
+.. _ceph_jenkins: https://jenkins.ceph.com/
 .. _Chacra: https://github.com/ceph/chacra/blob/master/README.rst
 .. _Pulpito: http://pulpito.front.sepia.ceph.com/
 .. _Running Your First Test: ../../running-tests-locally/#running-your-first-test
@@ -299,4 +367,9 @@ https://github.com/ceph/ceph-ci/branches.
 .. _Suites Inventory: ../tests-integration-testing-teuthology-intro/#suites-inventory
 .. _Testing Priority: ../tests-integration-testing-teuthology-intro/#testing-priority
 .. _Triggering Tests: ../tests-integration-testing-teuthology-workflow/#triggering-tests
+.. _Integration Test Introduction Page: ../tests-integration-testing-teuthology-intro/#how-integration-tests-are-defined
 .. _tests-sentry-developers-guide: ../tests-sentry-developers-guide/
+.. _smithi: https://wiki.sepia.ceph.com/doku.php?id=hardware:smithi
+.. _teuthology installation guide: https://docs.ceph.com/projects/teuthology/en/latest/INSTALL.html#installation-and-setup
+.. _Filter Tests by their Description: ../tests-integration-testing-teuthology-intro/#filtering-tests-by-their-description
+.. _developer playground machine: https://wiki.sepia.ceph.com/doku.php?id=devplayground
