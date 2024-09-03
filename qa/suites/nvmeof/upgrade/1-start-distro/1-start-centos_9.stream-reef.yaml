@@ -1,0 +1,45 @@
+os_type: centos
+os_version: "9.stream"
+
+roles:
+- - mon.a
+  - mon.c
+  - mgr.y
+  - osd.0
+  - osd.1
+  - osd.2
+  - osd.3
+  - client.0
+  - host.a
+  - ceph.nvmeof.nvmeof.a
+- - mon.b
+  - mgr.x
+  - osd.4
+  - osd.5
+  - osd.6
+  - osd.7
+  - host.b
+  - client.1
+
+tasks:
+- cephadm:
+    image: quay.ceph.io/ceph-ci/ceph:reef-nvmeof
+    compiled_cephadm_branch: reef
+
+- nvmeof:
+    installer: host.a
+    gw_image: quay.io/ceph/nvmeof:1.2.16
+    rbd:
+      pool_name: mypool
+      image_name_prefix: myimage
+    gateway_config:
+      enable_groups: false
+      subsystems_count: 3
+      namespaces_count: 20
+      cli_image: quay.io/ceph/nvmeof-cli:1.2.16
+- cephadm.wait_for_service:
+    service: nvmeof.mypool
+- cephadm.shell:
+    mon.a:
+      - ceph config get mgr mgr/cephadm/container_image_nvmeof
+      - ceph config set mgr mgr/cephadm/container_image_nvmeof quay.io/ceph/nvmeof:1.2.17
