@@ -1,0 +1,30 @@
+tasks:
+- nvmeof:
+    installer: host.a
+    gw_image: quay.io/ceph/nvmeof:1.2.16
+    rbd:
+      pool_name: mypool
+      image_name_prefix: myimage
+    gateway_config:
+      enable_groups: false
+      subsystems_count: 3
+      namespaces_count: 20
+      cli_image: quay.io/ceph/nvmeof-cli:1.2.16
+
+- cephadm.wait_for_service:
+    service: nvmeof.mypool
+
+- workunit:
+    no_coverage_and_limits: true
+    clients:
+      client.0:
+        - nvmeof/setup_subsystem.sh
+    env:
+      RBD_POOL: mypool
+      RBD_IMAGE_PREFIX: myimage
+
+- cephadm.shell:
+    mon.a:
+      - ceph config get mgr mgr/cephadm/container_image_nvmeof
+      - ceph config set mgr mgr/cephadm/container_image_nvmeof quay.io/ceph/nvmeof:1.2.17
+ 
