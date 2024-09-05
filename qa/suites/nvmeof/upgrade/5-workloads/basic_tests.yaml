@@ -1,9 +1,0 @@
-tasks:
-- workunit:
-    no_coverage_and_limits: true
-    clients:
-      client.1:
-        - nvmeof/basic_tests.sh
-    env:
-      RBD_POOL: mypool
-      RBD_IMAGE_PREFIX: myimage
