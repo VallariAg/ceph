@@ -924,7 +924,7 @@ void NVMeofGwMap::get_health_checks(health_check_map_t *checks) const
   //test3
   ostringstream ss3;
   ss3 << "VALLARI_TEST testwarn 4 ";
-  checks->get_or_add("NVMEOF_CLONE_TOO_FEW_OSDS", HEALTH_WARN, ss3.str(), 1);  
+  checks->get_or_add("NVMEOF_GET_OR_ADD", HEALTH_WARN, ss3.str(), 1);  
 }
 
 int NVMeofGwMap::blocklist_gw(

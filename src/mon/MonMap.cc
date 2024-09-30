@@ -760,6 +760,11 @@ void MonMap::check_health(health_check_map_t *checks) const
       d.detail.swap(detail);
     }
   }
+
+  //test3
+  ostringstream ss3;
+  ss3 << "VALLARI_TEST testwarn monmap ";
+  checks->get_or_add("NVMEOF_TEST_SECOND", HEALTH_WARN, ss3.str(), 1);  
 }
 
 #ifdef WITH_SEASTAR
