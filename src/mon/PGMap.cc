@@ -2762,7 +2762,7 @@ void PGMap::get_health_checks(
     }
   }
 
-  // TOO_FEW_OSDS
+  // TOO_FEW_OSDS - example "[WRN] TOO_FEW_OSDS: OSD count 1 < osd_pool_default_size 2"
   auto warn_too_few_osds = cct->_conf.get_val<bool>("mon_warn_on_too_few_osds");
   auto osd_pool_default_size = cct->_conf.get_val<uint64_t>("osd_pool_default_size");
   if (warn_too_few_osds && osdmap.get_num_osds() < osd_pool_default_size) {
@@ -2770,7 +2770,7 @@ void PGMap::get_health_checks(
     ss << "OSD count " << osdmap.get_num_osds()
 	 << " < osd_pool_default_size " << osd_pool_default_size;
     checks->add("TOO_FEW_OSDS", HEALTH_WARN, ss.str(),
-		osd_pool_default_size - osdmap.get_num_osds());
+		osd_pool_default_size - osdmap.get_num_osds()); // 2 - 1
   }
 
   // SLOW_PING_TIME
@@ -3415,6 +3415,11 @@ void PGMap::get_health_checks(
       d.detail.swap(detail);
     }
   }
+  
+  //test3
+  ostringstream ss3;
+  ss3 << "VALLARI_TEST testwarn pg ";
+  checks->add("NVMEOF_PGMAP", HEALTH_WARN, ss3.str(), 1);  
 }
 
 void PGMap::print_summary(ceph::Formatter *f, ostream *out) const
