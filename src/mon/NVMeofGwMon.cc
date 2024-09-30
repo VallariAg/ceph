@@ -196,6 +196,7 @@ void NVMeofGwMon::update_from_paxos(bool *need_bootstrap)
     bufferlist bl;
     int err = get_version(version, bl);
     ceph_assert(err == 0);
+    load_health();
 
     auto p = bl.cbegin();
     map.decode(p);
