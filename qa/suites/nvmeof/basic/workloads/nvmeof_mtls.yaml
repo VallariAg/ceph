@@ -9,6 +9,7 @@ tasks:
       subsystems_count: 3
       namespaces_count: 20
       cli_image: quay.io/ceph/nvmeof-cli:latest
+      create_mtls_secrets: true
 
 - cephadm.wait_for_service:
     service: nvmeof.mypool.mygroup0

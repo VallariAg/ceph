@@ -9,8 +9,8 @@ wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O 
 subjectAltName=$(echo "$NVMEOF_GATEWAY_IP_ADDRESSES" | sed 's/,/,IP:/g')
 
 # create certs and keys
-sudo openssl req -x509 -newkey rsa:4096 -nodes -keyout /etc/ceph/server.key -out /etc/ceph/server.crt -days 3650 -subj /CN=my.server -addext "subjectAltName=IP:$subjectAltName"
-sudo openssl req -x509 -newkey rsa:4096 -nodes -keyout /etc/ceph/client.key -out /etc/ceph/client.crt -days 3650 -subj '/CN=client1'
+# sudo openssl req -x509 -newkey rsa:4096 -nodes -keyout /etc/ceph/server.key -out /etc/ceph/server.crt -days 3650 -subj /CN=my.server -addext "subjectAltName=IP:$subjectAltName"
+# sudo openssl req -x509 -newkey rsa:4096 -nodes -keyout /etc/ceph/client.key -out /etc/ceph/client.crt -days 3650 -subj '/CN=client1'
 
 # deploy with mtls
 ceph orch ls nvmeof --export > /tmp/gw-conf-original.yaml
@@ -26,12 +26,13 @@ sudo /tmp/yq ".spec.enable_auth=true | \
 # output=$(sudo cat /etc/ceph/server.key)
 # echo $output
 # output=$output /tmp/yq e '.spec.certificate = strenv(output)' nvmeof-test.yaml
-
+cat /tmp/gw-conf-with-mtls.yaml 
 
 ceph orch rm nvmeof.mypool.mygroup0
+sleep 100
 ceph orch apply -i /tmp/gw-conf-with-mtls.yaml
 
-sleep 30
+sleep 100
 ceph orch ps
 ceph orch ls --refresh
 
