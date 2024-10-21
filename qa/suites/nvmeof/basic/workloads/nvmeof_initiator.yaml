@@ -16,7 +16,7 @@ tasks:
 - workunit:
     no_coverage_and_limits: true
     clients:
-      client.0:
+      client.5:
         - nvmeof/setup_subsystem.sh
     env:
       RBD_POOL: mypool

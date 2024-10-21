@@ -44,6 +44,7 @@ do
         echo "Adding gateway listener $index with IP ${ip} and name ${name}"
         sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $ip --server-port $NVMEOF_SRPORT listener add --subsystem $subsystem_nqn --host-name $name --traddr $ip --trsvcid $NVMEOF_PORT
     done
+    curl 'localhost:9095/api/v1/alerts' | jq .
 done
 
 # add all hosts
