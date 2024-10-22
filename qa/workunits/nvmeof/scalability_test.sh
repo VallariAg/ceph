@@ -9,10 +9,10 @@ if [ -z "$GATEWAYS" ]; then
     exit 1
 fi
 
-pip3 install yq
+# pip3 install yq
 
 status_checks() {
-    ceph nvme-gw show mypool ''
+    ceph nvme-gw show mypool mygroup0
     ceph orch ls
     ceph orch ps 
     ceph -s
@@ -22,17 +22,23 @@ status_checks() {
 echo "[nvmeof.scale] Setting up config to remove gateways ${GATEWAYS}"
 ceph orch ls nvmeof --export > /tmp/nvmeof-gw.yaml
 cat /tmp/nvmeof-gw.yaml
-yq "del(.placement.hosts[] | select(. | test(\".*($(echo $GATEWAYS | sed 's/,/|/g'))\")))" /tmp/nvmeof-gw.yaml > /tmp/nvmeof-gw-new.yaml
+# cp /tmp/nvmeof-gw.yaml /tmp/nvmeof-gw-new.yaml 
+
+pattern=$(echo $GATEWAYS | sed 's/,/\\|/g')
+sed "/$pattern/d" /tmp/nvmeof-gw.yaml > /tmp/nvmeof-gw-new.yaml  
+
+# yq "del(.placement.hosts[] | select(. | test(\".*($(echo $GATEWAYS | sed 's/,/|/g'))\")))" /tmp/nvmeof-gw.yaml > /tmp/nvmeof-gw-new.yaml
 cat /tmp/nvmeof-gw-new.yaml
 
 echo "[nvmeof.scale] Starting scale testing by removing ${GATEWAYS}"
 status_checks
-ceph orch rm nvmeof.mypool && sleep 20 # temp workaround
 ceph orch apply -i /tmp/nvmeof-gw-new.yaml # downscale
+ceph orch redeploy nvmeof.mypool.mygroup0 
 sleep $DELAY
 status_checks
-ceph orch rm nvmeof.mypool && sleep 20 # temp workaround
+echo "[nvmeof.scale] Downscale complete - removed gateways (${GATEWAYS}); now scaling back up"
 ceph orch apply -i /tmp/nvmeof-gw.yaml #upscale
+ceph orch redeploy nvmeof.mypool.mygroup0 
 sleep $DELAY
 status_checks
 
