@@ -9,3 +9,4 @@ overrides:
 tasks:
 - nvmeof.thrash:
     checker_host: 'client.0'
+    seed: '1729621734'
