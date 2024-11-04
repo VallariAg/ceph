@@ -888,19 +888,31 @@ void NVMeofGwMap::get_health_checks(health_check_map_t *checks) const
   for (const auto& created_map_pair: created_gws) {
     const auto& group_key = created_map_pair.first;
     auto& group = group_key.second;
-    const NvmeGwMonStates& gw_created_map = created_map_pair.second;
-    if ( gw_created_map.size() == 1) {
+    const NvmeGwMonStates& gws_states = created_map_pair.second;
+    if ( gws_states.size() == 1) {
       ostringstream ss;
       ss << "NVMeoF Gateway Group '" << group << "' has 1 gateway." ;
       singleGatewayDetail.push_back(ss.str());
     }
-    for (const auto& gw_created_pair: gw_created_map) {
-      const auto& gw_id = gw_created_pair.first;
-      const auto& gw_created  = gw_created_pair.second;
-      if (gw_created.availability == gw_availability_t::GW_UNAVAILABLE) {
-        ostringstream ss;
-        ss << "NVMeoF Gateway '" << gw_id << "' is unavailable." ;
-        gatewayDownDetail.push_back(ss.str());
+    for (const auto& gw_state: gws_states) {
+      const auto& gw_id = gw_state.first;
+      const NvmeGwMonState& gw_created  = gw_state.second;   
+      NvmeAnaGrpId ana_group = gw_created.ana_grp_id; 
+      if (gw_created.availability == gw_availability_t::GW_UNAVAILABLE) 
+      {
+        auto found_gw_active_ana_group = false;
+	      for (const auto& gw_state2 : gws_states) {
+	        const NvmeGwMonState& state2 = gw_state2.second;
+	        if (state2.sm_state.at(ana_group) == gw_states_per_group_t::GW_ACTIVE_STATE) {
+	          found_gw_active_ana_group = true;
+	          break;
+	        }
+	      }
+        if (found_gw_active_ana_group == true) {
+          ostringstream ss;
+          ss << "NVMeoF Gateway '" << gw_id << "' is unavailable." ;
+          gatewayDownDetail.push_back(ss.str());
+        }
       }
     }
   }
