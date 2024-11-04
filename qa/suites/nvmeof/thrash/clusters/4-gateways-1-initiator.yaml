@@ -7,6 +7,7 @@ roles:
   - osd.1
   - client.1
   - ceph.nvmeof.nvmeof.a
+  - node-exporter.a
 - - host.b
   - mon.b
   - osd.2
@@ -14,6 +15,7 @@ roles:
   - osd.4
   - client.2
   - ceph.nvmeof.nvmeof.b
+  - node-exporter.b
 - - host.c
   - mon.c
   - osd.5
@@ -21,9 +23,14 @@ roles:
   - osd.7
   - client.3
   - ceph.nvmeof.nvmeof.c
+  - node-exporter.c
+  - alertmanager.a
 - - host.d
   - client.4
   - ceph.nvmeof.nvmeof.d
+  - prometheus.a
+  - grafana.a
+  - node-exporter.d
 
 
 overrides:
