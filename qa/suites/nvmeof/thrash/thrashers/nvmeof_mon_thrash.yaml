@@ -19,6 +19,7 @@ tasks:
 - nvmeof.thrash:
     checker_host: 'client.0'
     switch_thrashers: True
+    seed: 1732106908
 
 - mon_thrash:
     revive_delay: 60
@@ -26,3 +27,4 @@ tasks:
     thrash_many: true
     switch_thrashers: True
     logger: '[nvmeof.thrasher.mon_thrasher]'
+    seed: 1732106911
