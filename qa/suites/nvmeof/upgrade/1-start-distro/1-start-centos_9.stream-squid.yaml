@@ -1,0 +1,24 @@
+os_type: centos
+os_version: "9.stream"
+
+tasks:
+- cephadm:
+    image: quay.ceph.io/ceph-ci/ceph:8e86ce7b9675cd070aa1f7f675fb688f1f862e13
+    compiled_cephadm_branch: squid
+
+- nvmeof:
+    installer: host.a
+    gw_image: quay.io/ceph/nvmeof:1.3.3
+    rbd:
+      pool_name: mypool
+      image_name_prefix: myimage
+    gateway_config:
+      subsystems_count: 3
+      namespaces_count: 20
+      cli_image: quay.io/ceph/nvmeof-cli:1.3.3
+- cephadm.wait_for_service:
+    service: nvmeof.mypool.mygroup0
+- cephadm.shell:
+    mon.a:
+      - ceph config get mgr mgr/cephadm/container_image_nvmeof
+      - ceph config set mgr mgr/cephadm/container_image_nvmeof quay.io/ceph/nvmeof:devel
