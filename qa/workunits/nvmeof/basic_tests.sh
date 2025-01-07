@@ -2,7 +2,7 @@
 
 sudo modprobe nvme-fabrics
 sudo modprobe nvme-tcp
-sudo dnf reinstall nvme-cli -y
+# sudo dnf reinstall nvme-cli -y
 sudo lsmod | grep nvme
 nvme version
 

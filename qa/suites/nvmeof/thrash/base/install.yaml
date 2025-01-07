@@ -1,8 +1,8 @@
 use_shaman: True
 tasks:
-- install:
-    extra_packages:
-        - nvme-cli
+# - install:
+#     extra_packages:
+#         - nvme-cli
 - cephadm:
     watchdog_setup:
 - cephadm.shell:
