@@ -2283,12 +2283,69 @@ tests:
       values: '1+0x20'
     - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.5",cluster="mycluster"}'
       values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.6",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.7",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.8",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.9",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.10",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.11",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.12",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.13",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.14",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.15",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.16",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.17",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.18",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.19",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.20",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.21",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.22",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.23",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.24",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.25",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.26",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.27",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.28",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.29",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.30",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.31",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.32",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.33",cluster="mycluster"}'
+      values: '1+0x20'
+
    promql_expr_test:
-     - expr: count(ceph_nvmeof_gateway_info) by (cluster) > 4.00
+     - expr: count(ceph_nvmeof_gateway_info) by (cluster) > 32.00
        eval_time: 1m
        exp_samples:
          - labels: '{cluster="mycluster"}'
-           value: 5
+           value: 33
    alert_rule_test:
     - eval_time: 5m
       alertname: NVMeoFTooManyGateways
@@ -2299,7 +2356,7 @@ tests:
           type: ceph_default
         exp_annotations:
           summary: "Max supported gateways exceeded on cluster mycluster"
-          description: "You may create many gateways, but 4 is the tested limit"
+          description: "You may create many gateways, but 32 is the tested limit"
 
  # NVMeoFMaxGatewayGroupSize
  - interval: 1m
@@ -2314,16 +2371,24 @@ tests:
       values: '1+0x20'
     - series: 'ceph_nvmeof_gateway_info{group="group-1",addr="1.1.1.12",cluster="mycluster"}'
       values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{group="group-1",addr="1.1.1.10",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{group="group-1",addr="1.1.1.14",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{group="group-1",addr="1.1.1.11",cluster="mycluster"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{group="group-1",addr="1.1.1.13",cluster="mycluster"}'
+      values: '1+0x20' 
     - series: 'ceph_nvmeof_gateway_info{group="group-2",addr="1.1.1.4",cluster="mycluster"}'
       values: '1+0x20'
     - series: 'ceph_nvmeof_gateway_info{group="group-2",addr="1.1.1.5",cluster="mycluster"}'
       values: '1+0x20'
    promql_expr_test:
-     - expr: count(ceph_nvmeof_gateway_info) by (cluster, group) > 4.00
+     - expr: count(ceph_nvmeof_gateway_info) by (cluster, group) > 8.00
        eval_time: 1m
        exp_samples:
          - labels: '{cluster="mycluster",group="group-1"}'
-           value: 5
+           value: 9
    alert_rule_test:
     - eval_time: 5m
       alertname: NVMeoFMaxGatewayGroupSize
@@ -2335,7 +2400,7 @@ tests:
           type: ceph_default
         exp_annotations:
           summary: "Max gateways within a gateway group (group-1) exceeded on cluster mycluster"
-          description: "You may create many gateways in a gateway group, but 4 is the tested limit"
+          description: "You may create many gateways in a gateway group, but 8 is the tested limit"
 
  # NVMeoFSingleGatewayGroup
  - interval: 1m
@@ -2472,6 +2537,50 @@ tests:
           summary: "The number of subsystems defined to the gateway exceeds supported values on cluster mycluster"
           description: "Although you may continue to create subsystems in node-1, the configuration may not be supported"
 
+# NVMeoFTooManyNamespaces
+ - interval: 1m
+   input_series:
+    - series: 'ceph_nvmeof_subsystem_namespace_count{instance="node-1:10008",nqn="nqn1",cluster="mycluster"}'
+      values: '200+0x10'
+    - series: 'ceph_nvmeof_subsystem_namespace_count{instance="node-1:10008",nqn="nqn2",cluster="mycluster"}'
+      values: '200+0x10'
+    - series: 'ceph_nvmeof_subsystem_namespace_count{instance="node-1:10008",nqn="nqn3",cluster="mycluster"}'
+      values: '200+0x10'
+    - series: 'ceph_nvmeof_subsystem_namespace_count{instance="node-1:10008",nqn="nqn4",cluster="mycluster"}'
+      values: '200+0x10'
+    - series: 'ceph_nvmeof_subsystem_namespace_count{instance="node-1:10008",nqn="nqn5",cluster="mycluster"}'
+      values: '200+0x10'
+    - series: 'ceph_nvmeof_subsystem_namespace_count{instance="node-1:10008",nqn="nqn6",cluster="mycluster"}'
+      values: '200+0x10'
+    - series: 'ceph_nvmeof_subsystem_namespace_count{instance="node-1:10008",nqn="nqn7",cluster="mycluster"}'
+      values: '200+0x10'
+    - series: 'ceph_nvmeof_subsystem_namespace_count{instance="node-1:10008",nqn="nqn8",cluster="mycluster"}'
+      values: '200+0x10'
+    - series: 'ceph_nvmeof_subsystem_namespace_count{instance="node-1:10008",nqn="nqn9",cluster="mycluster"}'
+      values: '200+0x10'
+    - series: 'ceph_nvmeof_subsystem_namespace_count{instance="node-1:10008",nqn="nqn10",cluster="mycluster"}'
+      values: '200+0x10'
+    - series: 'ceph_nvmeof_subsystem_namespace_count{instance="node-1:10008",nqn="nqn11",cluster="mycluster"}'
+      values: '200+0x10'
+   promql_expr_test:
+     - expr: sum by(gateway_host, cluster) (label_replace(ceph_nvmeof_subsystem_namespace_count,"gateway_host","$1","instance","(.*):.*")) > 2048
+       eval_time: 1m
+       exp_samples:
+         - labels: '{gateway_host="node-1", cluster="mycluster"}'
+           value: 2200
+   alert_rule_test:
+    - eval_time: 5m
+      alertname: NVMeoFTooManyNamespaces
+      exp_alerts:
+      - exp_labels:
+          gateway_host: node-1
+          severity: warning
+          cluster: mycluster
+          type: ceph_default
+        exp_annotations:
+          summary: "The number of namespaces defined to the gateway exceeds supported values on cluster mycluster"
+          description: "Although you may continue to create namespaces in node-1, the configuration may not be supported"
+
  # NVMeoFVersionMismatch
  - interval: 1m
    input_series:
@@ -2501,15 +2610,15 @@ tests:
  - interval: 1m
    input_series:
     - series: 'ceph_nvmeof_subsystem_host_count{nqn="nqn1",cluster="mycluster"}'
-      values: '2 2 2 4 4 8 8 8 10 10 20 20 32 34 34 38 38 40 44 44'
+      values: '2 4 8 10 20 30 40 50 62 74 80 95 100 110 130 130 130 130 130 130'
     - series: 'ceph_nvmeof_subsystem_host_count{nqn="nqn2",cluster="mycluster"}'
-      values: '2 2 2 8 8 8 16 16 16 16 16 16 16 16 16 16 16 16 16 16'
+      values: '2 8 16 16 16 16 16 16 16 16 20 20 32 34 34 36 37 37 37 37'
    promql_expr_test:
-     - expr: ceph_nvmeof_subsystem_host_count > 32.00
+     - expr: ceph_nvmeof_subsystem_host_count > 128.00
        eval_time: 15m
        exp_samples:
          - labels: '{__name__="ceph_nvmeof_subsystem_host_count",nqn="nqn1",cluster="mycluster"}'
-           value: 38
+           value: 130
    alert_rule_test:
     - eval_time: 20m
       alertname: NVMeoFHighClientCount
@@ -2521,7 +2630,76 @@ tests:
           type: ceph_default
         exp_annotations:
           summary: "The number of clients connected to nqn1 is too high on cluster mycluster"
-          description: "The supported limit for clients connecting to a subsystem is 32"
+          description: "The supported limit for clients connecting to a subsystem is 128"
+ 
+ # NVMeoFMissingListener
+ - interval: 1m
+   input_series:
+    - series: 'ceph_nvmeof_subsystem_listener_count{nqn="nqn1", instance="node-1:9100"}'
+      values: '0 0 0 0 0 0 0 0 0 0 0'
+    - series: 'ceph_nvmeof_subsystem_listener_count{nqn="nqn1", instance="node-2:9100"}'
+      values: '1 1 1 1 1 1 1 1 1 1 1'
+    - series: 'ceph_nvmeof_subsystem_listener_count{nqn="nqn1", instance="node-3:9100"}'
+      values: '1 1 1 1 1 1 1 1 1 1 1'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.1", instance="node-1:9100"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.2", instance="node-2:9100"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.3", instance="node-3:9100"}'
+      values: '1+0x20'      
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.4", instance="node-4:9100"}'
+      values: '1+0x20'
+   promql_expr_test:
+     - expr: ceph_nvmeof_subsystem_listener_count == 0 and on(nqn) sum(ceph_nvmeof_subsystem_listener_count) by (nqn) > 0
+       eval_time: 1m
+       exp_samples:
+         - labels: '{__name__="ceph_nvmeof_subsystem_listener_count", instance="node-1:9100", nqn="nqn1"}'
+           value: 0
+   alert_rule_test:
+    - eval_time: 10m
+      alertname: NVMeoFMissingListener
+      exp_alerts:
+      - exp_labels:
+          instance: node-1:9100
+          nqn: nqn1
+          severity: warning
+          type: ceph_default
+        exp_annotations:
+          summary: "No listener added for node-1:9100 NVMe-oF Gateway to nqn1 subsystem"
+          description: "For every subsystem, each gateway should have a listener to balance traffic between gateways." 
+
+ # NVMeoFZeroListenerSubsystem
+ - interval: 1m
+   input_series:
+    - series: 'ceph_nvmeof_subsystem_listener_count{nqn="nqn1"}'
+      values: '0 0 0 0 0 0 0 0'
+    - series: 'ceph_nvmeof_subsystem_listener_count{nqn="nqn2"}'
+      values: '0 1 1 1 2 2 3 4'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.1"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.2"}'
+      values: '1+0x20'
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.3"}'
+      values: '1+0x20'      
+    - series: 'ceph_nvmeof_gateway_info{addr="1.1.1.4"}'
+      values: '1+0x20'
+   promql_expr_test:
+     - expr: ceph_nvmeof_subsystem_listener_count == 0
+       eval_time: 1m
+       exp_samples:
+         - labels: '{__name__="ceph_nvmeof_subsystem_listener_count",nqn="nqn1"}'
+           value: 0
+   alert_rule_test:
+    - eval_time: 10m
+      alertname: NVMeoFZeroListenerSubsystem
+      exp_alerts:
+      - exp_labels:
+          nqn: nqn1
+          severity: warning
+          type: ceph_default
+        exp_annotations:
+          summary: "No listeners added to nqn1 subsystem"
+          description: "NVMeoF gateway configuration incomplete; one of the subsystems have zero listeners."
 
  # NVMeoFHighHostCPU
  - interval: 1m
