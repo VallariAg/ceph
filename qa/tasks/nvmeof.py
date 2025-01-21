@@ -401,7 +401,11 @@ class NvmeofThrasher(Thrasher, Greenlet):
             ], check_status=False)
         elif chosen_method == "systemctl_stop":
             # To bypass is_started logic of CephadmUnit
-            daemon.remote.sh(daemon.stop_cmd, check_status=False)
+            # daemon.remote.sh(daemon.stop_cmd, check_status=False)
+            daemon.remote.run(args=[
+                "ceph", "orch", "daemon", "stop",
+                d_name
+            ], check_status=False)
         elif chosen_method == "daemon_remove":
             daemon.remote.run(args=[
                 "ceph", "orch", "daemon", "rm",
