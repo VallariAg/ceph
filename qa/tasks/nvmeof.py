@@ -419,10 +419,11 @@ class NvmeofThrasher(Thrasher, Greenlet):
         # note: temporarily use 'daemon start' to restart
         # daemons instead of 'systemctl start'
         elif killed_method == "systemctl_stop":
-            daemon.remote.run(args=[
-                "ceph", "orch", "daemon", "start",
-                name
-            ])
+            daemon.remote.sh(daemon.start_cmd, check_status=False)
+            # daemon.remote.run(args=[
+            #     "ceph", "orch", "daemon", "start",
+            #     name
+            # ])
         else:
             daemon.remote.run(args=[
                 "ceph", "orch", "daemon", "start",
