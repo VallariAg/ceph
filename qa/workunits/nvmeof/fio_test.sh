@@ -79,6 +79,6 @@ if [ "$rbd_iostat" = true  ]; then
     timeout 20 rbd perf image iostat $RBD_POOL --iterations $iterations &
 fi
 fio --showcmd $fio_file
-sudo fio $fio_file 
+sudo fio $fio_file --debug=io 
 
 echo "[nvmeof.fio] fio test successful!"
