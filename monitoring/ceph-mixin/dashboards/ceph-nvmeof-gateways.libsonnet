@@ -5,9 +5,9 @@ local g = import 'grafonnet/grafana.libsonnet';
   'ceph-nvmeof-overview.json': $.dashboardSchema(
     'Ceph NVMe-oF Gateways',
     'Ceph NVMe-oF gateways overview',
-    'c4eff735-53a9-4f7d-88ec-fc2d45e2e7d6",',
+    'c4eff735-53a9-4f7d-88ec-fc2d45e2e7d7',
     'now-1h',
-    '5s', // TODO 
+    '10s', 
     13,
     $._config.dashboardTags,
     ''
@@ -21,7 +21,7 @@ local g = import 'grafonnet/grafana.libsonnet';
       'Annotations & Alerts',
       'dashboard'
     )
-  ).addRequired( // TODO: see these "addRequired"
+  ).addRequired(
     type='grafana', id='grafana', name='Grafana', version='5.3.2'
   ).addRequired(
     type='panel', id='graph', name='Graph', version='5.0.0'
@@ -33,13 +33,39 @@ local g = import 'grafonnet/grafana.libsonnet';
     g.template.datasource('datasource', 'prometheus', 'default', label='Data Source')
   ).addTemplate(
     $.addClusterTemplate()
-  )
-  .addTemplate(
+  ).addTemplate(
+    $.addCustomTemplate(
+      name='interval',
+      query='5s,10s,30s,1m,10m,30m,1h,6h,12h,1d,7d,14d,30d',
+      current='$__auto_interval_interval',
+      refresh=2,
+      label='Interval',
+      auto_count=10,
+      auto_min='1m',
+      options=[
+        { selected: true, text: 'auto', value: '$__auto_interval_interval' },
+        { selected: false, text: '5s', value: '5s' },
+        { selected: false, text: '10s', value: '10s' },
+        { selected: false, text: '30s', value: '30s' },
+        { selected: false, text: '1m', value: '1m' },
+        { selected: false, text: '10m', value: '10m' },
+        { selected: false, text: '30m', value: '30m' },
+        { selected: false, text: '1h', value: '1h' },
+        { selected: false, text: '6h', value: '6h' },
+        { selected: false, text: '12h', value: '12h' },
+        { selected: false, text: '1d', value: '1d' },
+        { selected: false, text: '7d', value: '7d' },
+        { selected: false, text: '14d', value: '14d' },
+        { selected: false, text: '30d', value: '30d' },
+      ],
+      auto=true,
+    )
+  ).addTemplate(
       $.addTemplateSchema(
         'gateway', // name 
         '$datasource',
         'label_values(ceph_nvmeof_gateway_info,hostname)', // query definition
-        1, // refresh
+        2, // refresh
         false, // include all
         0, // sort
         'Gateway Hostname', // label
@@ -67,7 +93,6 @@ local g = import 'grafonnet/grafana.libsonnet';
         orientation="auto",
         textMode="auto",
         interval='1m',
-        transparent=true,
         color={ mode: 'thresholds' },
         thresholdsMode='absolute',
         pluginVersion='11.0.0'
@@ -98,7 +123,6 @@ local g = import 'grafonnet/grafana.libsonnet';
         orientation="auto",
         textMode="auto",
         interval='1m',
-        transparent=true,
         color={ mode: 'thresholds' },
         thresholdsMode='absolute',
         pluginVersion='11.0.0'
@@ -129,7 +153,6 @@ local g = import 'grafonnet/grafana.libsonnet';
         orientation="auto",
         textMode="auto",
         interval='1m',
-        transparent=true,
         color={ mode: 'thresholds' },
         thresholdsMode='absolute',
         pluginVersion='11.0.0'
@@ -153,6 +176,7 @@ local g = import 'grafonnet/grafana.libsonnet';
         title='Subsystem Security',
         description="WARNING if any subsystem is defined with open/no security",
         unit='none',
+        decimals=0,
         datasource='$datasource',
         gridPosition={ x: 7, y: 1, w: 3, h: 6 },
         colorMode="background_solid",
@@ -161,25 +185,25 @@ local g = import 'grafonnet/grafana.libsonnet';
         orientation="auto",
         textMode="auto",
         interval='1m',
-        transparent=true,
         color={ mode: 'thresholds' },
         thresholdsMode='absolute',
         pluginVersion='11.0.0'
       ).addMappings([
-        { options: { match: null, result: { index: 0, text: 'OK', "color": "dark-green" } }, type: 'special' },
-        { options: { match: null, from: 1, to: 9999, result: { index: 1, text: 'WARNING', "color": "dark-yellow" } }, type: 'range' },
-      ])
-      .addThresholds([
-        { color: 'green' }
+        { options: { match: "null", result: { index: 0, text: 'OK', "color": "dark-green" } }, type: 'special' },
+        { options: { from: 1, to: 9999, result: { index: 1, text: 'WARNING', "color": "dark-yellow" } }, type: 'range' },
       ])
       .addTarget($.addTargetSchema(
         expr='count(ceph_nvmeof_subsystem_metadata{allow_any_host=\"yes\"}) ',
-        instant=true,
+        instant=false,
+        exemplar=false,
         legendFormat="__auto",
-        range=false,
-        format='', // does not exist in json, so added ''
+        range=true,
+        format='',
         datasource='$datasource',
-      )),
+      )) + { fieldConfig: { defaults: { mappings: [
+        { options: { match: "null", result: { index: 0, text: 'OK', "color": "dark-green" } }, type: 'special' },
+        { options: { from: 1, to: 9999, result: { index: 1, text: 'WARNING', "color": "dark-yellow" } }, type: 'range' },
+      ], thresholds: { mode: 'absolute', steps: [{ color: 'green' }] } } } },
 
       $.addStatPanel(
         title='Namespaces',
@@ -192,7 +216,6 @@ local g = import 'grafonnet/grafana.libsonnet';
         orientation="auto",
         textMode="auto",
         interval='1m',
-        transparent=true, // TODO: maybe remove
         color={ mode: 'thresholds' },
         thresholdsMode='absolute',
         pluginVersion='11.0.0'
@@ -225,15 +248,14 @@ local g = import 'grafonnet/grafana.libsonnet';
         orientation="auto",
         textMode="auto",
         interval='1m',
-        transparent=true, // TODO: maybe remove
         color={ mode: 'thresholds' },
         thresholdsMode='absolute',
         pluginVersion='11.0.0'
       ).addMappings([
-        { options: { match: null, result: { index: 1, text: '0' } }, type: 'special' },
+        { options: { match: 'null', result: { index: 1, text: '0' } }, type: 'special' },
       ])
       .addThresholds([
-        { color: 'green' },
+        { color: 'green', value: null },
         { color: 'red', value: 80 }
       ])
       .addTarget($.addTargetSchema(
@@ -244,7 +266,7 @@ local g = import 'grafonnet/grafana.libsonnet';
         legendFormat="__auto",
         range=false,
         datasource='$datasource',
-      )),
+      )) + { fieldConfig: { defaults: { unit: "bytes" } } },
 
       $.addStatPanel(
         title='Total IOPS',
@@ -259,7 +281,6 @@ local g = import 'grafonnet/grafana.libsonnet';
         orientation="auto",
         textMode="auto",
         interval='1m',
-        transparent=true, // TODO: maybe remove
         color={ mode: 'thresholds' },
         thresholdsMode='absolute',
         pluginVersion='11.0.0'
@@ -288,13 +309,10 @@ local g = import 'grafonnet/grafana.libsonnet';
         orientation="auto",
         textMode="auto",
         interval='1m',
-        transparent=true, // TODO: maybe remove
+        transparent=false, 
         color={ mode: 'thresholds' },
-        thresholdsMode='absolute',
         pluginVersion='11.0.0'
-      ).addThresholds([
-        { color: 'semi-dark-blue' }
-      ])
+      )
       .addTarget($.addTargetSchema(
         expr="sum (rate(ceph_nvmeof_bdev_read_bytes_total[30s]) + rate(ceph_nvmeof_bdev_written_bytes_total[30s]))",
         format='', 
@@ -302,19 +320,15 @@ local g = import 'grafonnet/grafana.libsonnet';
         legendFormat="__auto",
         range=true,
         datasource='$datasource',
-      )),
+      )) + { fieldConfig: { defaults: { color: { mode: 'thresholds' }, decimals: 0, unit: 'binBps', thresholds: { mode: 'absolute', steps: [{ color: 'semi-dark-blue', value: 'null' }] } } } },
 
       $.addGaugePanel(
         title='Busiest Gateway CPU',
         description="Shows the highest average CPU on a gateway within the gateway group",
         gridPosition={ h: 6, w: 3, x: 21, y: 1 },
         unit='percentunit',
-        // TODO add: orientation="auto",
         max=100,
         min=0,
-        // TODO add:  decimals=2,
-        // TODO add: thresholdsMode='percentage',
-        // TODO add: color={ mode: 'thresholds' },
         interval='1m',
         pluginVersion='11.0.0'
       )
@@ -324,13 +338,14 @@ local g = import 'grafonnet/grafana.libsonnet';
         { color: 'red', value: 80 },
       ])
       .addTarget($.addTargetSchema(
-        expr="max(avg by(instance) (rate(ceph_nvmeof_reactor_seconds_total{mode=\"busy\"}[1m])))",
+        expr='max(avg by(instance) (rate(ceph_nvmeof_reactor_seconds_total{mode="busy"}[1m])))',
         instant=false,
         range=true,
+        format='',
         legendFormat="__auto",
         interval='$interval',
         datasource='$datasource'
-      )),
+      )) + { fieldConfig: { defaults: { max: 100, min: 0, decimals: 2, unit: "percentunit" } } },
 
       $.addTableExtended(
         datasource='$datasource',
@@ -437,7 +452,6 @@ local g = import 'grafonnet/grafana.libsonnet';
             { color: 'red', value: 80 }, 
           ],
         },
-        // pluginVersion='11.0.0'  // TODO: will this work?
       )
       .addTargets([
         $.addTargetSchema(
@@ -453,8 +467,80 @@ local g = import 'grafonnet/grafana.libsonnet';
       ]) + { fieldConfig: { defaults: { color: { mode: 'palette-classic' }, thresholds: { mode: 'absolute', steps: [{ color: 'green', value: null }, { color: 'red', value: 80 }] }, min: 0 }, overrides: [{ matcher: { id: 'byType', unit: 'number' }, properties: [{ id: 'unit', value: 'decbytes' }] }] } }
       + { options: { orientation: 'horizontal', reduceOptions: { calcs: ['lastNotNull'], fields: '/^Value$/', limit: 5, values: true }, displayMode: 'basic',  maxVizHeight: 50, minVizHeight: 16, minVizWidth: 8, namePlacement: 'top', showUnfilled: true, sizing: "manual", "valueMode": "text" } },
 
-      // TODO: add barchart 'Count of Namespace by ANA Group' 
-      
+      $.barChartPanel(
+        title='Count of Namespace by ANA Group',
+        description='Shows the distribution of namespaces by ANA group. Ideally, the namespaces should be evenly distributed across ANA groups.',
+        datasource='$datasource',
+        gridPos={ h: 9, w: 6, x: 13, y: 7 },
+        axisCenteredZero=false,
+        min=0,
+        axisColorMode='text',
+        axisLabel='Namespaces', 
+        axisPlacement='auto',
+        fillOpacity=80,
+        gradientMode='hue',
+        lineWidth=1,
+        scaleDistributionType='linear',
+        thresholdsStyleMode='off',
+        unit='none',
+        colorMode='thresholds',
+        tooltip={
+          "maxHeight": 600,
+          "mode": "multi",
+          "sort": "desc"
+        },
+        displayMode='list',
+        placement='bottom',
+        showLegend=false,
+        thresholdsMode='absolute',
+      )
+      .addThresholds([
+        { color: 'green', value: null },
+      ])
+      .addTargets(
+        [
+          $.addTargetSchema(
+            expr='count by(anagrpid) ((count by(anagrpid,bdev_name) (ceph_nvmeof_subsystem_namespace_metadata)))',
+            datasource='$datasource',
+            instant=true,
+            interval='10s',
+            format='table',
+            legendFormat='__auto',
+            range=false,
+          ),
+        ]
+      )
+      .addOverrides(
+        [
+          {
+            matcher: { id: 'byName', options: 'Value' },
+            properties: [
+              {
+                id: 'custom.scaleDistribution',
+                value: { type: "linear" },
+              },
+              {
+                id: "custom.axisPlacement",
+                value: "hidden"
+              }
+            ],
+          },
+          {
+            matcher: { id: 'byName', options: 'anagrpid' },
+            properties: [
+              {
+                id: 'custom.axisLabel',
+                value: 'ANA Group ID',
+              },
+            ],
+          },
+        ]
+      ),
+
+
+
+
+
       $.pieChartPanel(
         title='Clients Connected by Gateway',
         description='Even segments show clients are connected across the gateways in a uniform manner.',
@@ -508,8 +594,6 @@ local g = import 'grafonnet/grafana.libsonnet';
         drawStyle='line',
         fillOpacity=0,
         gradientMode='none',
-        // hideFrom
-        // insertNulls
         lineInterpolation='linear',
         lineWidth=1,
         pointSize=5,
@@ -540,8 +624,9 @@ local g = import 'grafonnet/grafana.libsonnet';
           $.addTargetSchema(
             expr='avg by(instance) (rate(ceph_nvmeof_reactor_seconds_total{mode=\"busy\"}[1m]))',
             datasource='$datasource',
-            interval='$interval',
+            interval='10s',
             instant=false,
+            format='',
             legendFormat='{{name}}',
             range=true,
           ),
@@ -550,7 +635,6 @@ local g = import 'grafonnet/grafana.libsonnet';
 
       $.timeSeriesPanel(
         title='Reactor Threads CPU Usage : $gateway',
-        // description='Reactor thread CPU busy comes from the SPDK',
         datasource='$datasource',
         gridPosition={ h: 8, w: 8, x: 8, y: 17 },
         axisCenteredZero=false,
@@ -561,8 +645,6 @@ local g = import 'grafonnet/grafana.libsonnet';
         drawStyle='line',
         fillOpacity=0,
         gradientMode='none',
-        // hideFrom
-        // insertNulls
         lineInterpolation='linear',
         lineWidth=1,
         pointSize=5,
@@ -593,8 +675,9 @@ local g = import 'grafonnet/grafana.libsonnet';
           $.addTargetSchema(
             expr='rate(ceph_nvmeof_reactor_seconds_total{mode=\"busy\", instance=~\"$gateway.*\"}[1m])',
             datasource='$datasource',
-            interval='$interval',
             instant=false,
+            interval='10s',
+            format='',
             legendFormat='{{name}}',
             range=true,
           ),
@@ -614,8 +697,6 @@ local g = import 'grafonnet/grafana.libsonnet';
         drawStyle='line',
         fillOpacity=0,
         gradientMode='none',
-        // hideFrom
-        // insertNulls
         lineInterpolation='linear',
         lineWidth=1,
         pointSize=5,
@@ -646,28 +727,23 @@ local g = import 'grafonnet/grafana.libsonnet';
           $.addTargetSchema(
             expr='avg((rate(ceph_nvmeof_bdev_read_seconds_total[30s]) / rate(ceph_nvmeof_bdev_reads_completed_total[30s])) > 0)',
             datasource='$datasource',
-            // interval='$interval',
             instant=false,
             legendFormat='Reads',
             range=true,
-            // refId="A",
           ),
           $.addTargetSchema(
             expr='avg((rate(ceph_nvmeof_bdev_write_seconds_total[30s]) / rate(ceph_nvmeof_bdev_writes_completed_total[30s])) > 0)',
             datasource='$datasource',
-            // interval='$interval',
             instant=false,
             hide=false,
             legendFormat='Writes',
             range=true,
-            // refId="B",
           ),
         ]
       ),
 
       $.timeSeriesPanel(
         title='IOPS by Gateway',
-        // description='',
         datasource='$datasource',
         gridPosition={ h: 8, w: 8, x: 0, y: 25 },
         axisCenteredZero=false,
@@ -678,8 +754,6 @@ local g = import 'grafonnet/grafana.libsonnet';
         drawStyle='line',
         fillOpacity=0,
         gradientMode='none',
-        // hideFrom
-        // insertNulls
         lineInterpolation='linear',
         lineWidth=1,
         pointSize=5,
@@ -710,7 +784,7 @@ local g = import 'grafonnet/grafana.libsonnet';
           $.addTargetSchema(
             expr='sum by(instance) (rate(ceph_nvmeof_bdev_reads_completed_total[1m]) + rate(ceph_nvmeof_bdev_writes_completed_total[1m]))',
             datasource='$datasource',
-            interval='$interval',
+            interval='10s',
             instant=false,
             legendFormat='__auto',
             range=true,
@@ -720,7 +794,6 @@ local g = import 'grafonnet/grafana.libsonnet';
 
       $.timeSeriesPanel(
         title='IOPS by NVMe-oF Subsystem',
-        // description='',
         datasource='$datasource',
         gridPosition={ h: 8, w: 8, x: 8, y: 25 },
         axisCenteredZero=false,
@@ -731,8 +804,6 @@ local g = import 'grafonnet/grafana.libsonnet';
         drawStyle='line',
         fillOpacity=0,
         gradientMode='none',
-        // hideFrom
-        // insertNulls
         lineInterpolation='linear',
         lineWidth=1,
         pointSize=5,
@@ -762,12 +833,11 @@ local g = import 'grafonnet/grafana.libsonnet';
           $.addTargetSchema(
             expr='\nsum by(nqn) ((rate(ceph_nvmeof_bdev_reads_completed_total[1m]) + rate(ceph_nvmeof_bdev_writes_completed_total[1m])) * on(instance,bdev_name) group_right ceph_nvmeof_subsystem_namespace_metadata)',
             datasource='$datasource',
-            interval='$interval',
+            interval='10s',
             instant=false,
             legendFormat='__auto',
             range=true,
             hide=false,
-            // refId='E',
           ),
         ]
       ),
@@ -785,8 +855,6 @@ local g = import 'grafonnet/grafana.libsonnet';
         drawStyle='line',
         fillOpacity=30,
         gradientMode='none',
-        // hideFrom
-        // insertNulls
         lineInterpolation='linear',
         lineWidth=1,
         pointSize=5,
@@ -817,12 +885,11 @@ local g = import 'grafonnet/grafana.libsonnet';
           $.addTargetSchema(
             expr='topk(5, (sum by(pool_name, rbd_name) (((rate(ceph_nvmeof_bdev_reads_completed_total[1m]) + rate(ceph_nvmeof_bdev_writes_completed_total[1m])) * on(instance,bdev_name) group_right ceph_nvmeof_bdev_metadata) * on(instance, bdev_name) group_left(nqn) ceph_nvmeof_subsystem_namespace_metadata{nqn=\"$subsystem\"})))',
             datasource='$datasource',
-            interval='$interval',
+            interval='10s',
             instant=false,
             legendFormat='{{pool_name}}/{{rbd_name}}',
             range=true,
             hide=false,
-            // refId="C",
           ),
         ]
       ),
@@ -840,8 +907,6 @@ local g = import 'grafonnet/grafana.libsonnet';
         drawStyle='line',
         fillOpacity=30,
         gradientMode='none',
-        // hideFrom
-        // insertNulls
         lineInterpolation='linear',
         lineWidth=1,
         pointSize=5,
@@ -872,18 +937,16 @@ local g = import 'grafonnet/grafana.libsonnet';
           $.addTargetSchema(
             expr='sum by(instance) (rate(ceph_nvmeof_bdev_read_bytes_total[1m]) + rate(ceph_nvmeof_bdev_written_bytes_total[1m]))',
             datasource='$datasource',
-            interval='$interval',
+            interval='10s',
             instant=false,
             legendFormat='{{name}}',
             range=true,
-            // refId='A',
           ),
         ]
       ),
 
       $.timeSeriesPanel(
         title='Throughput by NVMe-oF Subsystem',
-        // description='',
         datasource='$datasource',
         gridPosition={ h: 8, w: 8, x: 8, y: 33 },
         axisCenteredZero=false,
@@ -894,8 +957,6 @@ local g = import 'grafonnet/grafana.libsonnet';
         drawStyle='line',
         fillOpacity=10,
         gradientMode='none',
-        // hideFrom
-        // insertNulls
         lineInterpolation='linear',
         lineWidth=1,
         pointSize=5,
@@ -925,52 +986,47 @@ local g = import 'grafonnet/grafana.libsonnet';
           $.addTargetSchema(
             expr='sum by(pool_name,rbd_name) ((rate(ceph_nvmeof_bdev_reads_completed_total[1m]) * on(instance,bdev_name) group_right ceph_nvmeof_bdev_metadata) + (rate(ceph_nvmeof_bdev_writes_completed_total[1m]) * on(instance,bdev_name) group_right ceph_nvmeof_bdev_metadata))',
             datasource='$datasource',
-            interval='$interval',
+            interval='10s',
             instant=false,
             legendFormat='{{pool_name}}/{{rbd_name}}',
             range=true,
             hide=true,
-            // refId='A'
           ),
           $.addTargetSchema(
             expr='sum by(pool_name,rbd_name) ((rate(ceph_nvmeof_bdev_read_bytes_total[1m]) * on(instance,bdev_name) group_right ceph_nvmeof_bdev_metadata) + (rate(ceph_nvmeof_bdev_written_bytes_total[1m]) * on(instance,bdev_name) group_right ceph_nvmeof_bdev_metadata))',
             datasource='$datasource',
-            interval='$interval',
+            interval='10s',
             instant=false,
             legendFormat='{{pool_name}}/{{rbd_name}}',
             range=true,
             hide=true,
-            // refId='B',
           ),
           $.addTargetSchema(
             expr='rate(ceph_nvmeof_bdev_reads_completed_total[1m])',
             datasource='$datasource',
-            interval='$interval',
+            interval='10s',
             instant=false,
             legendFormat='__auto',
             range=true,
             hide=true,
-            // refId='C',
           ),
           $.addTargetSchema(
             expr='count by(nqn,bdev_name) (count by(nqn,bdev_name) (ceph_nvmeof_subsystem_namespace_metadata))',
             datasource='$datasource',
-            interval='$interval',
+            interval='10s',
             instant=false,
             legendFormat='__auto',
             range=true,
             hide=true,
-            // refId='D',
           ),
           $.addTargetSchema(
             expr='\nsum by(nqn) ((rate(ceph_nvmeof_bdev_read_bytes_total[1m]) + rate(ceph_nvmeof_bdev_written_bytes_total[1m])) * on(instance,bdev_name) group_right ceph_nvmeof_subsystem_namespace_metadata)',
             datasource='$datasource',
-            interval='$interval',
+            interval='10s',
             instant=false,
             legendFormat='__auto',
             range=true,
             hide=false,
-            // refId='E',
           ),
         ]
       ),
@@ -979,7 +1035,7 @@ local g = import 'grafonnet/grafana.libsonnet';
         title="TOP 5 - Throughput by device for '$subsystem'",
         // description='Shows the rbd images (namespaces) with the highest throughput in a given subsystem',
         datasource='$datasource',
-        gridPosition={ h: 8, w: 8, x: 8, y: 17 },
+        gridPosition={ h: 8, w: 8, x: 16, y: 33 },
         axisCenteredZero=false,
         axisColorMode='text',
         axisLabel='',
@@ -988,8 +1044,6 @@ local g = import 'grafonnet/grafana.libsonnet';
         drawStyle='line',
         fillOpacity=30,
         gradientMode='none',
-        // hideFrom
-        // insertNulls
         lineInterpolation='linear',
         lineWidth=1,
         pointSize=5,
@@ -1020,12 +1074,11 @@ local g = import 'grafonnet/grafana.libsonnet';
           $.addTargetSchema(
             expr='topk(5, (sum by(pool_name, rbd_name) (((rate(ceph_nvmeof_bdev_read_bytes_total[1m]) + rate(ceph_nvmeof_bdev_written_bytes_total[1m])) * on(instance,bdev_name) group_right ceph_nvmeof_bdev_metadata) * on(instance, bdev_name) group_left(nqn) ceph_nvmeof_subsystem_namespace_metadata{nqn=\"$subsystem\"})))',
             datasource='$datasource',
-            interval='$interval',
+            interval='10s',
             instant=false,
             legendFormat='{{name}}',
             range=true,
             hide=false, 
-            // refId='C'
           ),
         ]
       ),
