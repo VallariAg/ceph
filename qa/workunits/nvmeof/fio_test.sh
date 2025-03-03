@@ -69,6 +69,7 @@ direct=1
 EOF
 
 status_log() {
+    echo "[nvmeof.fio]: fio failed!" 
     POOL="${RBD_POOL:-mypool}"
     GROUP="${NVMEOF_GROUP:-mygroup0}"
     ceph -s
