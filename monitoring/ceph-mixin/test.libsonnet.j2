@@ -31,23 +31,23 @@ local g = import 'grafonnet/grafana.libsonnet';
       if !$._config.showMultiCluster then 'variable' else '',
       multi=true,
       allValues='.*',
-    ),
+    )
   )
   {%- elif template.type == "query" -%}
   .addTemplate(
     $.addTemplateSchema(
       '{{ template.name }}',
       '$datasource',
-      '{{ template.query }}',
+      "{{ template.query }}",
       {{ template.refresh }},
-      {{ template.includeAll }},
+      {{ template.get('includeAll', true) | tojson }},
       {{ template.sort }},
       '{{ template.label }}',
       '{{ template.regex }}',
       {{ template.hide }},
-      multi={{ template.multi }},
+      multi={{ template.multi | tojson }},
       allValues='.*',
-    ),
+    )
   )
   {%- endif -%}
 {%- endfor -%}
@@ -56,7 +56,7 @@ local g = import 'grafonnet/grafana.libsonnet';
   .addPanels([
 {%- for panel in panels -%}
   {%- if panel.type == "row" %}  
-      $.addRowSchema(collapse={{ panel.collapsed }}, showTitle=true, title='{{ panel.title }}') + { gridPos: { x: {{ panel.gridPos.x }}, y: {{ panel.gridPos.y }}, w: {{ panel.gridPos.w }}, h: {{ panel.gridPos.h }} } },
+      $.addRowSchema(collapse={{ panel.collapsed | tojson }}, showTitle=true, title='{{ panel.title }}') + { gridPos: { x: {{ panel.gridPos.x }}, y: {{ panel.gridPos.y }}, w: {{ panel.gridPos.w }}, h: {{ panel.gridPos.h }} } }
   {%- else -%}
     {% if panel.type == "stat" %}
       $.addStatPanel(
@@ -86,7 +86,7 @@ local g = import 'grafonnet/grafana.libsonnet';
           mode: '{{ panel.get('fieldConfig', {}).get('defaults', {}).get('thresholds', {}).get('mode', '') }}',
           steps: [
           {%- for step in panel.fieldConfig.defaults.thresholds.steps  %}
-            { color: '{{ step.color }}', value: {{ step.value | default(none, true) }} },
+            { color: '{{ step.color }}', value: {{ step.get('value', none) | tojson }} },
           {%- endfor %}
           ],
         },
@@ -103,14 +103,14 @@ local g = import 'grafonnet/grafana.libsonnet';
         datasource='$datasource',
         fillOpacity={{ panel.fieldConfig.defaults.custom.fillOpacity }},
         pointSize={{ panel.fieldConfig.defaults.custom.pointSize }},
-        showPoints={{ panel.fieldConfig.defaults.custom.showPoints }},
+        showPoints='{{ panel.fieldConfig.defaults.custom.showPoints }}',
         unit='{{ panel.fieldConfig.defaults.unit }}',
         displayMode='{{ panel.options.legend.displayMode }}',
-        showLegend={{ panel.options.legend.showLegend }},
+        showLegend={{ panel.options.legend.showLegend | tojson }},
         placement='{{ panel.options.legend.placement }}',
         tooltip={{ panel.options.tooltip }},
         stackingMode='{{ panel.fieldConfig.defaults.custom.get('stacking', {}).get('mode', '') }}',
-        spanNulls={{ panel.fieldConfig.defaults.custom.spanNulls }},
+        spanNulls={{ panel.fieldConfig.defaults.custom.spanNulls | tojson }},
         decimals={{ panel.fieldConfig.defaults.decimals }},
         thresholdsMode='{{ panel.fieldConfig.defaults.thresholds.mode }}',
       )
@@ -120,10 +120,10 @@ local g = import 'grafonnet/grafana.libsonnet';
         datasource='$datasource',
         gridPosition={ x: {{ panel.gridPos.x }}, y: {{ panel.gridPos.y }}, w: {{ panel.gridPos.w }}, h: {{ panel.gridPos.h }} },
         color={{ panel.fieldConfig.defaults.color }},
-        options={{ panel.options }},
-        custom={{ panel.fieldConfig.defaults.custom }},
-        thresholds={{ panel.fieldConfig.defaults.thresholds }}
-        overrides={{ panel.fieldConfig.defaults.get('overrides', {}) }},
+        options={{ panel.options | tojson }},
+        custom={{ panel.fieldConfig.defaults.custom | tojson }},
+        thresholds={{ panel.fieldConfig.defaults.thresholds | tojson }},
+        overrides={{ panel.fieldConfig.defaults.get('overrides', {}) | tojson }},
       )
     {%- elif panel.type == "piechart" %}
       $.pieChartPanel(
@@ -133,16 +133,16 @@ local g = import 'grafonnet/grafana.libsonnet';
         gridPos={ x: {{ panel.gridPos.x }}, y: {{ panel.gridPos.y }}, w: {{ panel.gridPos.w }}, h: {{ panel.gridPos.h }} },
         displayMode='{{ panel.options.legend.displayMode }}',
         placement='{{ panel.options.legend.placement }}',
-        showLegend={{ panel.options.legend.showLegend }},
+        showLegend={{ panel.options.legend.showLegend | tojson }},
         displayLabels={{ panel.options.displayLabels }},
-        tooltip={{ panel.options.tooltip }}
+        tooltip={{ panel.options.tooltip }}, 
         pieType='{{ panel.options.pieType }}',
-        values={{ panel.options.legend.values }},
+        values={{ panel.options.legend.get('values', []) }},
         colorMode='{{ panel.fieldConfig.defaults.get('color', {}).get('mode', '') }}',
         overrides={{ panel.fieldConfig.overrides }},
-        reduceOptions={{ panel.options.reduceOptions }}
+        reduceOptions={{ panel.options.reduceOptions | tojson }}
       )
-    {%- elif panel.type == "piechart" %}
+    {%- elif panel.type == "alertlist" %}
       $.addAlertListPanel(
         title='{{ panel.title }}',
         datasource={
@@ -152,26 +152,20 @@ local g = import 'grafonnet/grafana.libsonnet';
         gridPosition={ x: {{ panel.gridPos.x }}, y: {{ panel.gridPos.y }}, w: {{ panel.gridPos.w }}, h: {{ panel.gridPos.h }} },
         alertInstanceLabelFilter='{alertname=~"^Ceph.+", %(matchers)s}' % $.matchers(),
         alertName='{{ panel.options.get('alertName', '') }}',
-        dashboardAlerts=false,
-        groupBy=[],
-        groupMode='default',
-        maxItems=20,
-        sortOrder=1,
-        stateFilter={
-          'error': true,
-          firing: true,
-          noData: false,
-          normal: false,
-          pending: true,
-        },
+        dashboardAlerts={{ panel.options.get('dashboardAlerts', false) | tojson }},
+        groupBy={{ panel.options.get('groupBy', '') }},
+        groupMode='{{ panel.options.get('groupMode', '') }}',
+        maxItems={{ panel.options.get('maxItems', '') }},
+        sortOrder={{ panel.options.get('sortOrder', '') }},
+        stateFilter={{ panel.options.get('stateFilter', {}) | tojson }},
       )
     {%- else %}
-
+TODO: {{ panel.type }}
     {%- endif %}
       {%- if panel.get('options', {}).get('fieldOptions', {}).get('defaults', {}).get('thresholds', {}).get('steps', []) -%}
       .addThresholds([
       {%- for threshold in panel.get('options', {}).get('fieldOptions', {}).get('defaults', {}).get('thresholds', {}).get('steps', []) %}
-        { color: '{{ threshold.color }}', value: {{ threshold.value | default(none, true) }} },
+        { color: '{{ threshold.color }}', value: {{ threshold.get('value', none) | tojson }} },
       {%- endfor %}
       ])
       {%- endif -%}
@@ -187,28 +181,49 @@ local g = import 'grafonnet/grafana.libsonnet';
       {%- for override in panel.get('fieldConfig', {}).get('overrides', {}) %}
         {
           matcher: { id: '{{ override.matcher.id }}', options: '{{ override.matcher.options }}' },
-          properties: {{ override.properties }},
+          properties: [
+          {%- for props in override.properties %}
+            {
+              id: '{{ props.id }}',
+              {%- if props.id == 'color' %}
+              value: { 
+                fixedColor: '{{ props.value.fixedColor }}', 
+                mode: '{{ props.value.mode }}' 
+              },
+              {%- elif props.id == 'links' %}
+              value: [
+                {%- for v in props.value %}
+                {
+                  title: {{ v.get('title', '') | tojson }},
+                  url: '{{ v.url }}'
+                },
+                {%- endfor %}
+              ], 
+              {%- else %}
+              value: {{ props.value | tojson }}
+              {%- endif %}
+            },
+          {%- endfor %}
+          ],
         },
       {%- endfor %}
       ])
       {%- endif %}
-      {%- if panel.get('targets', []) -%}
-      .addTargets([
-      {%- for target in panel.targets %}
+      {%- for target in panel.get('targets', []) %}
+      .addTarget(
         $.addTargetSchema(
           expr="{{ target.expr }}",
           format='{{ target.format }}',
-          instant={{ target.instant }},
+          instant={{ target.get('instant', true) | tojson }},
           legendFormat="{{ target.legendFormat }}",
-          range={{ target.range }},
+          range={{ target.range | tojson }},
           datasource='$datasource',
-        ),
+        )
+      )
       {%- endfor %}
-      ])
-      {%- endif -%}
       {%- if panel.get('transformations', []) -%}
       .addTransformations(
-        {{ panel.transformations }}
+        {{ panel.transformations | tojson }}
       )
       {%- endif -%}
   {%- endif -%}
