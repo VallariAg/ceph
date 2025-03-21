@@ -1,8 +1,8 @@
 {
   /**
-   * Creates a [Time series panel](https://grafana.com/docs/grafana/latest/panels-visualizations/visualizations/time-series/).
+   * Creates a [Bar chart panel](https://grafana.com/docs/grafana/latest/panels-visualizations/visualizations/bar-chart/).
    *
-   * @name timeseries_panel.new
+   * @name barchart_panel.new
    *
    * @param title (default `''`) Panel title.
    * @param description (default null) Panel description.
@@ -10,7 +10,7 @@
   new(
     title='',
     description=null,
-    pluginVersion='9.1.3',
+    pluginVersion='11.0.0',
     gridPos={},
     datasource='',
     colorMode='palette-classic',
@@ -18,18 +18,10 @@
     axisColorMode='text',
     axisLabel='',
     axisPlacement='auto',
-    barAlignment=0,
-    drawStyle='line',
     fillOpacity=0,
     gradientMode='none',
-    lineInterpolation='linear',
     lineWidth=0,
-    pointSize=0,
     scaleDistributionType='linear',
-    showPoints='',
-    spanNulls=false,
-    stackingGroup='A',
-    stackingMode='none',
     thresholdsStyleMode='off',
     decimals=null,
     thresholdsMode='absolute',
@@ -43,10 +35,18 @@
     scaleDistributionLog=null,
     sortBy=null,
     sortDesc=null,
-    noValue=null,
+    orientation='auto',
+    showValue='auto',
+    stacking='none',
+    groupWidth=0.7,
+    barWidth=0.97,
+    barRadius=0,
+    fullHighlight=false,
+    xTickLabelRotation=0,
+    xTickLabelSpacing=0
   ):: {
     title: title,
-    type: 'timeseries',
+    type: 'barchart',
     [if description != null then 'description']: description,
     pluginVersion: pluginVersion,
     gridPos: gridPos,
@@ -59,8 +59,6 @@
           axisColorMode: axisColorMode,
           axisLabel: axisLabel,
           axisPlacement: axisPlacement,
-          barAlignment: barAlignment,
-          drawStyle: drawStyle,
           fillOpacity: fillOpacity,
           gradientMode: gradientMode,
           hideFrom: {
@@ -68,18 +66,10 @@
             tooltip: false,
             viz: false,
           },
-          lineInterpolation: lineInterpolation,
           lineWidth: lineWidth,
-          pointSize: pointSize,
           scaleDistribution: {
             [if scaleDistributionLog != null then 'scaleDistributionLog']: scaleDistributionLog,
             type: scaleDistributionType,
-          },
-          showPoints: showPoints,
-          spanNulls: spanNulls,
-          stacking: {
-            group: stackingGroup,
-            mode: stackingMode,
           },
           thresholdsStyle: {
             mode: thresholdsStyleMode,
@@ -91,12 +81,20 @@
           mode: thresholdsMode,
           steps: [],
         },
-        [if noValue != null then 'noValue']: noValue,
         unit: unit,
       },
       overrides: [],
     },
     options: {
+      orientation: orientation,
+      showValue: showValue,
+      stacking: stacking,
+      groupWidth: groupWidth,
+      barWidth: barWidth,
+      barRadius: barRadius,
+      fullHighlight: fullHighlight,
+      xTickLabelRotation: xTickLabelRotation,
+      xTickLabelSpacing: xTickLabelSpacing,
       legend: {
         calcs: [],
         displayMode: displayMode,
@@ -141,3 +139,5 @@
     addOverrides(overrides):: std.foldl(function(p, o) p.addOverride(o.matcher, o.properties), overrides, self),
   },
 }
+
+

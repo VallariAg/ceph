@@ -1,6 +1,7 @@
 local g = import 'grafonnet/grafana.libsonnet';
 local pieChartPanel = import 'piechart_panel.libsonnet';
 local timeSeries = import 'timeseries_panel.libsonnet';
+local barChartPanel = import 'barchart_panel.libsonnet';
 
 {
   _config:: error 'must provide _config',
@@ -412,6 +413,7 @@ local timeSeries = import 'timeseries_panel.libsonnet';
     isGrayOnNoData=null,
     isHideAlertsOnDisable=null,
     isIgnoreOKColors=null,
+    noValue=null,
   )::
     g.statPanel.new(
       title=title,
@@ -428,6 +430,7 @@ local timeSeries = import 'timeseries_panel.libsonnet';
       pluginVersion=pluginVersion,
       decimals=decimals,
       thresholdsMode=thresholdsMode,
+      noValue=noValue
     ) + {
       [if interval != null then 'interval']: interval,
       [if maxDataPoints != null then 'maxDataPoints']: maxDataPoints,
@@ -609,6 +612,7 @@ local timeSeries = import 'timeseries_panel.libsonnet';
     scaleDistributionLog=null,
     sortBy=null,
     sortDesc=null,
+    noValue=null,
   )::
     timeSeries.new(
       title=title,
@@ -643,6 +647,7 @@ local timeSeries = import 'timeseries_panel.libsonnet';
       scaleDistributionLog=scaleDistributionLog,
       sortBy=sortBy,
       sortDesc=sortDesc,
+      noValue=noValue,
     ) + {
       pluginVersion: pluginVersion,
       [if interval != null then 'interval']: interval,
@@ -680,6 +685,86 @@ local timeSeries = import 'timeseries_panel.libsonnet';
       overrides=overrides,
       reduceOptions=reduceOptions,
     ),
+
+  barChartPanel(
+    title='',
+    description=null,
+    pluginVersion='11.0.0',
+    gridPos={},
+    datasource='',
+    colorMode='palette-classic',
+    axisCenteredZero=false,
+    axisColorMode='text',
+    axisLabel='',
+    axisPlacement='auto',
+    fillOpacity=0,
+    gradientMode='none',
+    lineWidth=0,
+    scaleDistributionType='linear',
+    thresholdsStyleMode='off',
+    decimals=null,
+    thresholdsMode='absolute',
+    unit='none',
+    tooltip={},
+    legend={},
+    displayMode='list',
+    placement='bottom',
+    showLegend=true,
+    min=null,
+    scaleDistributionLog=null,
+    sortBy=null,
+    sortDesc=null,
+    orientation='auto',
+    showValue='auto',
+    stacking='none',
+    groupWidth=0.7,
+    barWidth=0.97,
+    barRadius=0,
+    fullHighlight=false,
+    xTickLabelRotation=0,
+    xTickLabelSpacing=0
+  )::
+    barChartPanel.new(
+      title=title,
+      description=description,
+      pluginVersion=pluginVersion,
+      gridPos=gridPos,
+      datasource=datasource,
+      colorMode=colorMode,
+      axisCenteredZero=axisCenteredZero,
+      axisColorMode=axisColorMode,
+      axisLabel=axisLabel,
+      axisPlacement=axisPlacement,
+      fillOpacity=fillOpacity,
+      gradientMode=gradientMode,
+      lineWidth=lineWidth,
+      scaleDistributionType=scaleDistributionType,
+      thresholdsStyleMode=thresholdsStyleMode,
+      decimals=decimals,
+      thresholdsMode=thresholdsMode,
+      unit=unit,
+      tooltip=tooltip,
+      legend=legend,
+      displayMode=displayMode,
+      placement=placement,
+      showLegend=showLegend,
+      min=min,
+      scaleDistributionLog=scaleDistributionLog,
+      sortBy=sortBy,
+      sortDesc=sortDesc,
+      orientation=orientation,
+      showValue=showValue,
+      stacking=stacking,
+      groupWidth=groupWidth,
+      barWidth=barWidth,
+      barRadius=barRadius,
+      fullHighlight=fullHighlight,
+      xTickLabelRotation=xTickLabelRotation,
+      xTickLabelSpacing=xTickLabelSpacing,
+    ) + {
+      pluginVersion: pluginVersion
+    },
+
 
   heatMapPanel(
     title='',
