@@ -3,9 +3,9 @@ local g = import 'grafonnet/grafana.libsonnet';
 
 (import 'utils.libsonnet') {
   'test.json': $.dashboardSchema(
-    'Ceph NVMe-oF Gateways - Overview (libsonnet)',
+    'Ceph NVMe-oF Gateways - Overview (17 March)',
     'Ceph NVMe-oF gateways overview',
-    "feeuv1dno43r4ddjhjssddabcd",
+    "feeuv1dno43r4ddjhjssdd",
     "now-6h",
     "30s", 
     "39",
