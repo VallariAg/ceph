@@ -413,6 +413,7 @@ local barChartPanel = import 'barchart_panel.libsonnet';
     isGrayOnNoData=null,
     isHideAlertsOnDisable=null,
     isIgnoreOKColors=null,
+    noValue=null,
   )::
     g.statPanel.new(
       title=title,
@@ -429,6 +430,7 @@ local barChartPanel = import 'barchart_panel.libsonnet';
       pluginVersion=pluginVersion,
       decimals=decimals,
       thresholdsMode=thresholdsMode,
+      noValue=noValue
     ) + {
       [if interval != null then 'interval']: interval,
       [if maxDataPoints != null then 'maxDataPoints']: maxDataPoints,
@@ -610,6 +612,7 @@ local barChartPanel = import 'barchart_panel.libsonnet';
     scaleDistributionLog=null,
     sortBy=null,
     sortDesc=null,
+    noValue=null,
   )::
     timeSeries.new(
       title=title,
@@ -644,6 +647,7 @@ local barChartPanel = import 'barchart_panel.libsonnet';
       scaleDistributionLog=scaleDistributionLog,
       sortBy=sortBy,
       sortDesc=sortDesc,
+      noValue=noValue,
     ) + {
       pluginVersion: pluginVersion,
       [if interval != null then 'interval']: interval,

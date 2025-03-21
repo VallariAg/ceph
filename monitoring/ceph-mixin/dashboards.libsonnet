@@ -10,5 +10,6 @@
     (import 'dashboards/rgw-s3-analytics.libsonnet') +
     (import 'dashboards/multi-cluster.libsonnet') +
     (import 'dashboards/ceph-nvmeof-gateways.libsonnet') +
+    (import 'dashboards/test.libsonnet') +
     { _config:: $._config },
 }

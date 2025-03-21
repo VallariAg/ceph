@@ -12,41 +12,40 @@ local g = import 'grafonnet/grafana.libsonnet';
     $._config.dashboardTags,
     ''
   )
+{%- for link in links -%}
+  .addLink(
+      $.addLinkSchema(
+        asDropdown={{ link.get('asDropdown', true) | tojson }},
+        icon='{{ link.get('icon', '') }}',
+        includeVars={{ link.get(includeVars, true) | tojson }},
+        keepTime={{ link.get('keepTime', true) | tojson }},
+        tags={{ link.get('tags', []) }},
+        targetBlank={{ link.get('targetBlank', false) | tojson }},
+        title='{{ link.get('title', '') }}',
+        tooltip='{{ link.get('tooltip', '') }}',
+        type='{{ link.get('type', '') }}',
+        url='{{ link.get('url', '') }}'
+      ),
+  )
+{%- endfor -%}
 {%- for template in templating.list -%}
   {%- if template.type == "datasource" -%}  
   .addTemplate(
     g.template.datasource('datasource', 'prometheus', 'default', label='Data Source')
   )
-  {%- elif template.name == "cluster" -%}
-  .addTemplate(
-    $.addTemplateSchema(
-      'cluster',
-      '$datasource',
-      'label_values(ceph_health_status, %s)' % $._config.clusterLabel,
-      1,
-      true,
-      1,
-      'cluster',
-      '(.*)',
-      if !$._config.showMultiCluster then 'variable' else '',
-      multi=true,
-      allValues='.*',
-    )
-  )
   {%- elif template.type == "query" -%}
   .addTemplate(
     $.addTemplateSchema(
-      '{{ template.name }}',
-      '$datasource',
-      "{{ template.query }}",
-      {{ template.refresh }},
-      {{ template.get('includeAll', true) | tojson }},
-      {{ template.sort }},
-      '{{ template.label }}',
-      '{{ template.regex }}',
-      {{ template.hide }},
+      name='{{ template.name }}',
+      datasource='$datasource',
+      query="{{ template.query }}",
+      refresh={{ template.refresh }},
+      includeAll={{ template.get('includeAll', true) | tojson }},
+      sort={{ template.sort }},
+      label='{{ template.label }}',
+      regex='{{ template.regex }}',
       multi={{ template.multi | tojson }},
-      allValues='.*',
+      current={{ template.get('current', none) | tojson }}
     )
   )
   {%- endif -%}
@@ -72,7 +71,7 @@ local g = import 'grafonnet/grafana.libsonnet';
         interval='1m',
         color={ mode: 'thresholds' },
         thresholdsMode='{{ panel.get('options', {}).get('fieldOptions', {}).get('defaults', {}).get('thresholds', {}).get('mode', '') }}',
-        pluginVersion='11.0.0'
+        noValue={{ panel.fieldConfig.defaults.get('noValue', none) | tojson }},
       )
     {%- elif panel.type == "bargauge" %}
       $.addBarGaugePanel(
@@ -88,7 +87,7 @@ local g = import 'grafonnet/grafana.libsonnet';
           {%- for step in panel.fieldConfig.defaults.thresholds.steps  %}
             { color: '{{ step.color }}', value: {{ step.get('value', none) | tojson }} },
           {%- endfor %}
-          ],
+          ]
         },
         {%- endif %}
       )
@@ -113,6 +112,7 @@ local g = import 'grafonnet/grafana.libsonnet';
         spanNulls={{ panel.fieldConfig.defaults.custom.spanNulls | tojson }},
         decimals={{ panel.fieldConfig.defaults.decimals }},
         thresholdsMode='{{ panel.fieldConfig.defaults.thresholds.mode }}',
+        noValue={{ panel.fieldConfig.defaults.noValue }},
       )
     {%- elif panel.type == "table" %}
       $.addTableExtended(
@@ -123,7 +123,7 @@ local g = import 'grafonnet/grafana.libsonnet';
         options={{ panel.options | tojson }},
         custom={{ panel.fieldConfig.defaults.custom | tojson }},
         thresholds={{ panel.fieldConfig.defaults.thresholds | tojson }},
-        overrides={{ panel.fieldConfig.defaults.get('overrides', {}) | tojson }},
+        overrides={{ panel.fieldConfig.get('overrides', {}) | tojson }},
       )
     {%- elif panel.type == "piechart" %}
       $.pieChartPanel(
@@ -150,7 +150,7 @@ local g = import 'grafonnet/grafana.libsonnet';
           uid: 'grafana',
         },
         gridPosition={ x: {{ panel.gridPos.x }}, y: {{ panel.gridPos.y }}, w: {{ panel.gridPos.w }}, h: {{ panel.gridPos.h }} },
-        alertInstanceLabelFilter='{alertname=~"^Ceph.+", %(matchers)s}' % $.matchers(),
+        alertInstanceLabelFilter='{{ panel.alertInstanceLabelFilter }}',
         alertName='{{ panel.options.get('alertName', '') }}',
         dashboardAlerts={{ panel.options.get('dashboardAlerts', false) | tojson }},
         groupBy={{ panel.options.get('groupBy', '') }},
@@ -162,9 +162,9 @@ local g = import 'grafonnet/grafana.libsonnet';
     {%- else %}
 TODO: {{ panel.type }}
     {%- endif %}
-      {%- if panel.get('options', {}).get('fieldOptions', {}).get('defaults', {}).get('thresholds', {}).get('steps', []) -%}
+      {%- if panel.type not in ["bargauge", "table"] and panel.get('fieldConfig', {}).get('defaults', {}).get('thresholds', {}).get('steps', []) -%}
       .addThresholds([
-      {%- for threshold in panel.get('options', {}).get('fieldOptions', {}).get('defaults', {}).get('thresholds', {}).get('steps', []) %}
+      {%- for threshold in panel.get('fieldConfig', {}).get('defaults', {}).get('thresholds', {}).get('steps', []) %}
         { color: '{{ threshold.color }}', value: {{ threshold.get('value', none) | tojson }} },
       {%- endfor %}
       ])
@@ -172,11 +172,40 @@ TODO: {{ panel.type }}
       {%- if panel.get('options', {}).get('fieldOptions', {}).get('defaults', {}).get('mappings', []) -%}
       .addMappings([
       {%- for mapping in panel.get('options', {}).get('fieldOptions', {}).get('defaults', {}).get('mappings', []) %}
-        { options: { match: null, result: { index: {{ mapping.options.result.index }}, text: '{{ mapping.options.result.text }}' } }, type: '{{ mapping.type }}' },
+        { 
+          options: { 
+            match: null, 
+            result: { 
+              index: {{ mapping.options.result.index }}, 
+              text: '{{ mapping.options.result.text }}',
+              {%- if mapping.options.result.get('color', '') %}
+              color: '{{ mapping.options.result.color }}',
+              {%- endif %}
+            } 
+          }, 
+          type: '{{ mapping.type }}' 
+        },
       {%- endfor %}
       ])
       {%- endif -%}
-      {%- if panel.get('fieldConfig', {}).get('overrides', {}) -%}
+      {%- for target in panel.get('targets', []) %}
+      .addTarget(
+        $.addTargetSchema(
+          expr="{{ target.expr }}",
+          format='{{ target.format }}',
+          instant={{ target.get('instant', none) | tojson }},
+          legendFormat="{{ target.legendFormat }}",
+          range={{ target.range | tojson }},
+          datasource='$datasource',
+        )
+      )
+      {%- endfor %}
+      {%- if panel.get('transformations', []) and panel.type == "table" -%}
+      .addTransformations(
+        {{ panel.transformations | tojson }}
+      )
+      {%- endif -%}
+      {%- if panel.get('fieldConfig', {}).get('overrides', {}) and panel.type not in ["bargauge", "table"] %}
       .addOverrides([
       {%- for override in panel.get('fieldConfig', {}).get('overrides', {}) %}
         {
@@ -209,26 +238,12 @@ TODO: {{ panel.type }}
       {%- endfor %}
       ])
       {%- endif %}
-      {%- for target in panel.get('targets', []) %}
-      .addTarget(
-        $.addTargetSchema(
-          expr="{{ target.expr }}",
-          format='{{ target.format }}',
-          instant={{ target.get('instant', true) | tojson }},
-          legendFormat="{{ target.legendFormat }}",
-          range={{ target.range | tojson }},
-          datasource='$datasource',
-        )
-      )
-      {%- endfor %}
-      {%- if panel.get('transformations', []) -%}
-      .addTransformations(
-        {{ panel.transformations | tojson }}
-      )
-      {%- endif -%}
+      {%- if panel.type == "bargauge" %}
+      + { fieldConfig: {{ panel.fieldConfig | tojson }}, options: {{ panel.options | tojson }} }
+      {%- endif %}
   {%- endif -%}
   ,
-{%- endfor %}
+{% endfor %}
   ])
 
 // end 
