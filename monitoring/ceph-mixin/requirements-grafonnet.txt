@@ -1,2 +1,3 @@
 jsondiff
 jinja2
+pytest

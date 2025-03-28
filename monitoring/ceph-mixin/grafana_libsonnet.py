@@ -1,4 +1,5 @@
-import argparse, textwrap
+import argparse
+import textwrap
 from pathlib import Path
 import json
 import sys
@@ -14,9 +15,9 @@ logger = logging.getLogger(__name__)
 
 
 parser = argparse.ArgumentParser(
-    formatter_class=argparse.RawDescriptionHelpFormatter, 
+    formatter_class=argparse.RawDescriptionHelpFormatter,
     description=textwrap.dedent("""Tool to convert grafana JSON to libsonnet.
-Example: python3 grafana-libsonnet-to-json.py dashboards_out/test.json --debug
+Example: python3 grafana-libsonnet-to-json.py dashboards_out/test.json -v
 Example: python3 grafana-libsonnet-to-json.py dashboards_out/test.json -o dashboards/output.libsonnet """),
 )
 parser.add_argument("json_path")
@@ -29,9 +30,11 @@ def read_json(path):
         json_data = json.load(f)
     return json_data
 
+
 def write_output(path, data):
     with open(str(path), "w") as f:
         f.write(data)
+
 
 def convert(json_data, json_file_name):
     env = Environment(loader=FileSystemLoader("."))
@@ -39,21 +42,21 @@ def convert(json_data, json_file_name):
     libsonnet_data = template.render(json_data, logger=logger, json_file=json_file_name)
     return libsonnet_data
 
+
 def main():
     cli = parser.parse_args()
 
-    if cli.verbose: 
-            logger.setLevel(logging.DEBUG)
+    if cli.verbose:
+        logger.setLevel(logging.DEBUG)
 
-    input_path = cli.json_path 
+    input_path = cli.json_path
     input_path = Path(input_path)
     if not input_path.exists():
-        raise Exception(f'Cannot find input JSON file at: {input_path}')
+        raise Exception(f"Cannot find input JSON file at: {input_path}")
 
     output_path = cli.output
     if not output_path:
         output_path = input_path.with_suffix(".libsonnet")
-
 
     json_data = read_json(str(input_path))
     libsonnet_data = convert(json_data, input_path.name)
@@ -61,5 +64,6 @@ def main():
 
     print(f"Successfully converted! Find output libsonnet at: '{output_path}'.")
 
-main() 
 
+if __name__ == "__main__":
+    main()
