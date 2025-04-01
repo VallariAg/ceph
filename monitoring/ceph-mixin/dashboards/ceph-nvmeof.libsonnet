@@ -584,7 +584,7 @@ local g = import 'grafonnet/grafana.libsonnet';
         },
         { 
           options: { 
-            match: null, 
+            from: 1, to: 9999, 
             result: { 
               index: 1, 
               text: 'WARNING',
@@ -592,6 +592,16 @@ local g = import 'grafonnet/grafana.libsonnet';
             } 
           }, 
           type: 'range' 
+        },
+        { 
+          options: { 
+            '0': {
+              index: 2, 
+              text: 'OK',
+              color: 'dark-green',
+            } 
+          }, 
+          type: 'value' 
         },
       ])
       .addTarget(

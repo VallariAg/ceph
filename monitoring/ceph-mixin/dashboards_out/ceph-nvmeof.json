@@ -935,14 +935,26 @@
                   {
                      "id": 1,
                      "options": {
-                        "match": null,
+                        "from": 1,
                         "result": {
                            "color": "dark-yellow",
                            "index": 1,
                            "text": "WARNING"
-                        }
+                        },
+                        "to": 9999
                      },
                      "type": "range"
+                  },
+                  {
+                     "id": 2,
+                     "options": {
+                        "0": {
+                           "color": "dark-green",
+                           "index": 2,
+                           "text": "OK"
+                        }
+                     },
+                     "type": "value"
                   }
                ],
                "thresholds": {
