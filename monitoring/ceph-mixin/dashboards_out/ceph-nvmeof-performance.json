@@ -71,7 +71,7 @@
                   "axisPlacement": "auto",
                   "barAlignment": 0,
                   "drawStyle": "line",
-                  "fillOpacity": 0,
+                  "fillOpacity": 8,
                   "gradientMode": "none",
                   "hideFrom": {
                      "legend": false,
@@ -163,7 +163,7 @@
                   "axisPlacement": "auto",
                   "barAlignment": 0,
                   "drawStyle": "line",
-                  "fillOpacity": 0,
+                  "fillOpacity": 8,
                   "gradientMode": "none",
                   "hideFrom": {
                      "legend": false,
@@ -255,7 +255,7 @@
                   "axisPlacement": "auto",
                   "barAlignment": 0,
                   "drawStyle": "line",
-                  "fillOpacity": 0,
+                  "fillOpacity": 8,
                   "gradientMode": "none",
                   "hideFrom": {
                      "legend": false,
@@ -357,7 +357,7 @@
                   "axisPlacement": "auto",
                   "barAlignment": 0,
                   "drawStyle": "line",
-                  "fillOpacity": 0,
+                  "fillOpacity": 8,
                   "gradientMode": "none",
                   "hideFrom": {
                      "legend": false,
@@ -449,7 +449,7 @@
                   "axisPlacement": "auto",
                   "barAlignment": 0,
                   "drawStyle": "line",
-                  "fillOpacity": 11,
+                  "fillOpacity": 8,
                   "gradientMode": "none",
                   "hideFrom": {
                      "legend": false,
@@ -537,7 +537,7 @@
                   "axisPlacement": "auto",
                   "barAlignment": 0,
                   "drawStyle": "line",
-                  "fillOpacity": 5,
+                  "fillOpacity": 8,
                   "gradientMode": "none",
                   "hideFrom": {
                      "legend": false,
@@ -629,7 +629,7 @@
                   "axisPlacement": "auto",
                   "barAlignment": 0,
                   "drawStyle": "line",
-                  "fillOpacity": 30,
+                  "fillOpacity": 8,
                   "gradientMode": "none",
                   "hideFrom": {
                      "legend": false,
@@ -721,7 +721,7 @@
                   "axisPlacement": "auto",
                   "barAlignment": 0,
                   "drawStyle": "line",
-                  "fillOpacity": 10,
+                  "fillOpacity": 8,
                   "gradientMode": "none",
                   "hideFrom": {
                      "legend": false,
@@ -809,7 +809,7 @@
                   "axisPlacement": "auto",
                   "barAlignment": 0,
                   "drawStyle": "line",
-                  "fillOpacity": 5,
+                  "fillOpacity": 8,
                   "gradientMode": "none",
                   "hideFrom": {
                      "legend": false,
