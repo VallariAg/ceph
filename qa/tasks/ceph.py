@@ -260,6 +260,7 @@ def ceph_log(ctx, config):
                 not (ctx.config.get('archive-on-error') and ctx.summary['success']):
             # and logs
             log.info('Compressing logs...')
+            time.sleep(30) # wait for files to be a little more stable before compressing
             run.wait(
                 ctx.cluster.run(
                     args=[
