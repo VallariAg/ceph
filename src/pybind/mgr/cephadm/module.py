@@ -2667,11 +2667,12 @@ Then run the following:
             raise OrchestratorError(
                 f'Unable to schedule redeploy for {daemon_name}: No standby MGRs')
 
-        if action == 'restart' and not force:
-            r = service_registry.get_service(daemon_type_to_service(
-                d.daemon_type)).ok_to_stop([d.daemon_id], force=False)
-            if r.retval:
-                raise OrchestratorError(f'Unable to {action} daemon {d.name()}: {r.stderr} \nNote: Warnings can be bypassed with the --force flag')
+        if action in ['restart', 'stop'] and not force:
+            if action == 'restart' or (action == 'stop' and d.daemon_type in ['nvmeof']):
+                r = service_registry.get_service(daemon_type_to_service(
+                    d.daemon_type)).ok_to_stop([d.daemon_id], force=False)
+                if r.retval:
+                    raise OrchestratorError(f'Unable to {action} daemon {d.name()}: {r.stderr} \nNote: Warnings can be bypassed with the --force flag')
 
         if action == 'rotate-key':
             if d.daemon_type not in ['mgr', 'osd', 'mds',
