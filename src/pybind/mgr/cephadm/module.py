@@ -2667,7 +2667,12 @@ Then run the following:
             raise OrchestratorError(
                 f'Unable to schedule redeploy for {daemon_name}: No standby MGRs')
 
-        if action == 'restart' and not force:
+        self.log.info(f'VALLARI_DEBUG action: {action}')
+        self.log.info(f'VALLARI_DEBUG force: {force}')
+        self.log.info(f'VALLARI_DEBUG d.daemon_type: {d.daemon_type}')
+        if action in ['restart', 'stop'] and not force:
+            # if action == 'stop' and d.daemon_type in ['nvmeof']:
+            # if action == 'restart' or (action == 'stop' and d.daemon_type in ['nvmeof']):
             r = service_registry.get_service(daemon_type_to_service(
                 d.daemon_type)).ok_to_stop([d.daemon_id], force=False)
             if r.retval:
@@ -2679,6 +2684,12 @@ Then run the following:
                 raise OrchestratorError(
                     f'key rotation not supported for {d.daemon_type}'
                 )
+    
+        # if action == 'stop' and not force:
+        #     r = service_registry.get_service(daemon_type_to_service(
+        #         d.daemon_type)).ok_to_stop([d.daemon_id], force=False)
+        #     if r.retval:
+        #         raise OrchestratorError(f'Unable to {action} daemon {d.name()}: {r.stderr} \nNote: Warnings can be bypassed with the --force flag')
 
         self._daemon_action_set_image(action, image, d.daemon_type, d.daemon_id)
 
