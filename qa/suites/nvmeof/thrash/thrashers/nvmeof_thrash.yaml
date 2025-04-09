@@ -12,5 +12,6 @@ overrides:
 
 tasks:
 - nvmeof.thrash:
+    seed: 1744120051
     checker_host: 'client.0'
     randomize: False
