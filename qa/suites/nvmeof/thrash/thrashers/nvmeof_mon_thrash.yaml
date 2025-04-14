@@ -1,6 +1,9 @@
 overrides:
   ceph:
-    log-ignorelist: 
+    log-ignorelist:
+      - OSD_DOWN
+      - OSD_HOST_DOWN
+      - OSD_ROOT_DOWN
       # mon thrashing
       - MON_DOWN
       - mons down
