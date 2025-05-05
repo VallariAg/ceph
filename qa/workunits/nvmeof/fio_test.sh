@@ -53,72 +53,117 @@ RUNTIME=${RUNTIME:-600}
 filename=$(echo "$selected_drives" | sed -z 's/\n/:\/dev\//g' | sed 's/:\/dev\/$//')
 filename="/dev/$filename"
 
-cat >> $fio_file <<EOF
+FIO_NVME=${TESTDIR:-$(mktemp -d)}/archive/fio-nvme
+mkdir -p $FIO_NVME
+fio_file="$FIO_NVME/temp_fio.ini"
+
+# List of iodepth values
+iodepth_values=(1 2 4 8 16 20 24 28 32 40 48)
+
+# Output CSV
+csv_output="$FIO_NVME/fio_results_4_dev_strong_same_sub.csv"
+echo "iodepth,job1_iops_mean,job1_clat_ns_mean,job2_iops_mean,job2_clat_ns_mean,job3_iops_mean,job3_clat_ns_mean,job4_iops_mean,job4_clat_ns_mean" > $csv_output
+#echo "iodepth,job1_iops_mean,job1_clat_ns_mean" >  $csv_output
+
+# Run fio for each iodepth
+for depth in "${iodepth_values[@]}"; do
+    echo "Running fio with iodepth=$depth"
+
+    json_file="${FIO_NVME}/fio_output_iodepth_${depth}.json"
+
+    # Create a temporary fio job file with current iodepth
+    cat > $FIO_NVME/temp_fio.ini <<EOF
 [global]
-ioengine=${IO_ENGINE:-sync}
-bsrange=${BS_RANGE:-4k-64k}
-numjobs=${NUM_OF_JOBS:-1}
-size=${SIZE:-1G}
+ioengine=libaio
+invalidate=0
+rw=randwrite
+runtime=90
 time_based=1
-runtime=$RUNTIME
-rw=${RW:-randrw}
-verify=md5
-verify_fatal=1
-do_verify=1
-serialize_overlap=1
-group_reporting
+ramp_time=30
+numjobs=1
 direct=1
+bs=4096B
+iodepth=$depth
+end_fsync=0
+norandommap=1
 
 EOF
 
+counter=1
 for i in $selected_drives; do
-  echo "[job-$i]" >> "$fio_file"
+  echo "[job$counter]" >> "$fio_file"
   echo "filename=/dev/$i" >> "$fio_file"
   echo "" >> "$fio_file"  # Adds a blank line
+  counter=$((counter+1))
 done
 
-cat $fio_file
+    cat $FIO_NVME/temp_fio.ini 
+    # Run fio and save output
+    fio --output-format=json $FIO_NVME/temp_fio.ini > "$json_file"
 
-status_log() {
-    POOL="${RBD_POOL:-mypool}"
-    GROUP="${NVMEOF_GROUP:-mygroup0}"
-    ceph -s
-    ceph orch host ls
-    ceph orch ls 
-    ceph orch ps
-    ceph health detail
-    ceph nvme-gw show $POOL $GROUP
-    sudo nvme list
-    sudo nvme list | wc -l
-    sudo nvme list-subsys
-    for device in $selected_drives; do
-        echo "Processing device: $device"
-        sudo nvme list-subsys /dev/$device
-        sudo nvme id-ns /dev/$device
-    done
+    # Extract write.iops_mean and write.clat_ns.mean for each job
+    job1_iops_mean=$(jq '.jobs[0].write.iops_mean' "$json_file")
+    job1_clat=$(jq '.jobs[0].write.clat_ns.mean' "$json_file")
     
-}
+    job2_iops_mean=$(jq '.jobs[1].write.iops_mean' "$json_file")
+    job2_clat=$(jq '.jobs[1].write.clat_ns.mean' "$json_file")
+    
+    job3_iops_mean=$(jq '.jobs[2].write.iops_mean' "$json_file")
+    job3_clat=$(jq '.jobs[2].write.clat_ns.mean' "$json_file")
+    
+    job4_iops_mean=$(jq '.jobs[3].write.iops_mean' "$json_file")
+    job4_clat=$(jq '.jobs[3].write.clat_ns.mean' "$json_file")
+
+    # Append results to CSV file
+    echo "$depth,$job1_iops_mean,$job1_clat,$job2_iops_mean,$job2_clat,$job3_iops_mean,$job3_clat,$job4_iops_mean,$job4_clat" >> "$csv_output"
+#    echo "$depth,$job1_iops_mean,$job1_clat" >> "$csv_output"
+done
+
+echo "Done. Results saved to $csv_output"
 
 
-echo "[nvmeof.fio] starting fio test..."
+# cat $fio_file
 
-if [ -n "$IOSTAT_INTERVAL" ]; then
-    iostat_count=$(( RUNTIME / IOSTAT_INTERVAL ))
-    iostat -d -p $selected_drives $IOSTAT_INTERVAL $iostat_count -h &
-fi
-if [ "$rbd_iostat" = true  ]; then
-    iterations=$(( RUNTIME / 5 ))
-    timeout 20 rbd perf image iostat $RBD_POOL --iterations $iterations &
-fi
-fio --showcmd $fio_file
+# status_log() {
+#     POOL="${RBD_POOL:-mypool}"
+#     GROUP="${NVMEOF_GROUP:-mygroup0}"
+#     ceph -s
+#     ceph orch host ls
+#     ceph orch ls 
+#     ceph orch ps
+#     ceph health detail
+#     ceph nvme-gw show $POOL $GROUP
+#     sudo nvme list
+#     sudo nvme list | wc -l
+#     sudo nvme list-subsys
+#     for device in $selected_drives; do
+#         echo "Processing device: $device"
+#         sudo nvme list-subsys /dev/$device
+#         sudo nvme id-ns /dev/$device
+#     done
+    
+# }
 
-set +e 
-sudo fio $fio_file
-if [ $? -ne 0 ]; then
-    echo "[nvmeof.fio]: fio failed!" 
-    status_log
-    exit 1
-fi
+
+# echo "[nvmeof.fio] starting fio test..."
+
+# if [ -n "$IOSTAT_INTERVAL" ]; then
+#     iostat_count=$(( RUNTIME / IOSTAT_INTERVAL ))
+#     iostat -d -p $selected_drives $IOSTAT_INTERVAL $iostat_count -h &
+# fi
+# if [ "$rbd_iostat" = true  ]; then
+#     iterations=$(( RUNTIME / 5 ))
+#     timeout 20 rbd perf image iostat $RBD_POOL --iterations $iterations &
+# fi
+# fio --showcmd $fio_file
+
+# set +e 
+# sudo fio $fio_file
+# if [ $? -ne 0 ]; then
+#     echo "[nvmeof.fio]: fio failed!" 
+#     status_log
+#     exit 1
+# fi
 
 
 echo "[nvmeof.fio] fio test successful!"
