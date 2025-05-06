@@ -29,7 +29,7 @@ tasks:
     clients:
       client.0:
         - nvmeof/basic_tests.sh
-        - nvmeof/fio_test.sh 
+        - nvmeof/fio_test.sh --random_devices 4
     env:
       RBD_POOL: mypool
       IOSTAT_INTERVAL: '10'
