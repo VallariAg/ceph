@@ -1349,8 +1349,13 @@ class Module(MgrModule, OrchestratorClientMixin):
                     1, rbd_mirror_metadata
                 )
             elif service_type == "nvmeof":
-                pass
+                self.metrics['nvmeof_metadata'].set(
+                    1, (service_id, 'vallari service_type', 'hostname', 'version', 'status')
+                )
         nvmeof_daemons = raise_if_exception(self.list_daemons(daemon_type='nvmeof')) 
+        self.metrics['nvmeof_metadata'].set(
+                len(nvmeof_daemons), ('test', 'vallari nvmeof_daemons', 'hostname', 'version', 'status')
+            )
         for daemon in nvmeof_daemons:
             daemon['ceph_daemon'] = f"{daemon.daemon_type}.{daemon.daemon_id}"
             daemon['status'] = str(daemon['status']) # prefer if status was int (like in DaemonDescriptionStatus)
