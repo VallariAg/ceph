@@ -100,6 +100,8 @@ RGW_METADATA = ('ceph_daemon', 'hostname', 'ceph_version', 'instance_id')
 RBD_MIRROR_METADATA = ('ceph_daemon', 'id', 'instance_id', 'hostname',
                        'ceph_version')
 
+NVMEOF_METADATA = ('ceph_daemon', 'service_name', 'hostname', 'version', 'status') # align to DaemonDescription
+
 DISK_OCCUPATION = ('ceph_daemon', 'device', 'db_device',
                    'wal_device', 'instance', 'devices', 'device_ids')
 
@@ -740,6 +742,13 @@ class Module(MgrModule, OrchestratorClientMixin):
             RBD_MIRROR_METADATA
         )
 
+        metrics['nvmeof_metadata'] = Metric(
+            'untyped',
+            'nvmeof_metadata',
+            'NVMeoF Metadata',
+            NVMEOF_METADATA
+        )
+
         metrics['pg_total'] = Metric(
             'gauge',
             'pg_total',
@@ -979,11 +988,24 @@ class Module(MgrModule, OrchestratorClientMixin):
         r = self.mon_command({
             'prefix': 'osd blocklist ls',
             'format': 'json'
-        })
+        }) # ceph nvme-gw show command to get nvmeof data?
         blocklist_entries = r[2].split(' ')
         blocklist_count = blocklist_entries[1]
         for stat in OSD_BLOCKLIST:
             self.metrics['cluster_{}'.format(stat)].set(int(blocklist_count))
+
+    # @profile_method() # what is profile method? do we need for nvmeof?
+    # def get_nvmeof_daemons_metrics(self) -> None:
+    #     cmd={"prefix":"nvme-gw show", "pool":"mypool", "group":"mygroup0"} # how to know pool/group name in nvmeof call
+    #     r = self.mon_command({
+    #         'prefix': 'osd blocklist ls',
+    #         'format': 'json'
+    #     }) # ceph nvme-gw show command to get nvmeof data?
+        
+    #     blocklist_entries = r[2].split(' ')
+    #     blocklist_count = blocklist_entries[1]
+    #     for stat in OSD_BLOCKLIST:
+    #         self.metrics['cluster_{}'.format(stat)].set(int(blocklist_count))
 
     @profile_method()
     def get_fs(self) -> None:
@@ -1118,6 +1140,7 @@ class Module(MgrModule, OrchestratorClientMixin):
     def get_service_list(self) -> Dict[Tuple[str, str], Tuple[str, str, str]]:
         ret = {}
         for server in self.list_servers():
+
             host = cast(str, server.get('hostname', ''))
             for service in cast(List[ServiceInfoT], server.get('services', [])):
                 ret.update({(service['id'], service['type']): (host,
@@ -1293,7 +1316,7 @@ class Module(MgrModule, OrchestratorClientMixin):
         # to match the one from exporter
         modify_instance_id = self.orch_is_available() and self.get_module_option('exclude_perf_counters')
         if modify_instance_id:
-            daemons = raise_if_exception(self.list_daemons(daemon_type='rgw'))
+            daemons = raise_if_exception(self.list_daemons(daemon_type='rgw')) # same can be queried for nvmeof?
             for daemon in daemons:
                 if daemon.daemon_id and '.' in daemon.daemon_id:
                     instance_id = daemon.daemon_id.split(".")[2]
@@ -1325,6 +1348,17 @@ class Module(MgrModule, OrchestratorClientMixin):
                 self.metrics['rbd_mirror_metadata'].set(
                     1, rbd_mirror_metadata
                 )
+            elif service_type == "nvmeof":
+                pass
+        nvmeof_daemons = raise_if_exception(self.list_daemons(daemon_type='nvmeof')) 
+        for daemon in nvmeof_daemons:
+            daemon['ceph_daemon'] = f"{daemon.daemon_type}.{daemon.daemon_id}"
+            daemon['status'] = str(daemon['status']) # prefer if status was int (like in DaemonDescriptionStatus)
+            nvmeof_metadata = cast(LabelValues,
+                                    (daemon.get(k, '') for k in NVMEOF_METADATA))
+            self.metrics['nvmeof_metadata'].set(
+                1, nvmeof_metadata
+            )
 
     @profile_method()
     def get_num_objects(self) -> None:
@@ -1719,6 +1753,7 @@ class Module(MgrModule, OrchestratorClientMixin):
         self.get_pool_repaired_objects()
         self.get_num_objects()
         self.get_all_daemon_health_metrics()
+        # self.get_nvmeof_daemons_metrics()
 
         if not self.get_module_option('exclude_perf_counters'):
             self.get_perf_counters()
