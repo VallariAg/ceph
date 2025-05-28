@@ -78,6 +78,16 @@ class NvmeofService(CephService):
             'iobuf_options': iobuf_options,
             'rados_id': rados_id
         }
+        if spec.default_listener_subnet_cidr:
+            self.mgr.log.info(f'VALLARI_DEBUG: {spec.default_listener_subnet_cidr=}')
+            # step 1: find this host's address which is part of default_listener_subnet_cidr
+            listener_addr = ""
+            # step 2: validate address
+            self._check_valid_addr(daemon_spec.host, listener_addr)
+            context['default_listener'] = listener_addr
+        if spec.default_listener_port:
+            self.mgr.log.info(f'VALLARI_DEBUG: {spec.default_listener_port=}')
+            context['default_listener_port'] = spec.default_listener_port
         gw_conf = self.mgr.template.render('services/nvmeof/ceph-nvmeof.conf.j2', context)
 
         daemon_spec.keyring = keyring
