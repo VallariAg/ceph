@@ -215,6 +215,9 @@ class Nvmeof(Task):
         _shell(self.ctx, self.cluster_name, self.remote, [
             'ceph', 'orch', 'host', 'ls'
         ])
+        daemons = list(self.ctx.daemons.iter_daemons_of_role('nvmeof', self.cluster))
+        for d in daemons:
+            d.stop()
         for i in range(self.groups_count):
             group_name = self.groups_prefix + str(i)
             service_name = f"nvmeof.{self.poolname}.{group_name}"
@@ -331,7 +334,7 @@ class NvmeofThrasher(Thrasher, Greenlet):
 
     def _get_devices(self, remote):
         GET_DEVICE_CMD = "sudo nvme list --output-format=json | " \
-            "jq -r '.Devices[].Subsystems[] | select(.Controllers | all(.ModelNumber == \"Ceph bdev Controller\")) | .Namespaces | sort_by(.NSID) | .[] | .NameSpace'"
+            "jq -r '.Devices | sort_by(.NameSpace) | .[] | select(.ModelNumber == \"Ceph bdev Controller\") | .DevicePath'"
         devices = remote.sh(GET_DEVICE_CMD).split()
         return devices
     
