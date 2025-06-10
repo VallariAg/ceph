@@ -1,8 +1,9 @@
 import errno
 import logging
 import json
+# from socket import _is_subnet_address
 from typing import List, cast, Optional
-from ipaddress import ip_address, IPv6Address
+from ipaddress import ip_address, IPv6Address, ip_network
 
 from mgr_module import HandleCommandResult
 from ceph.deployment.service_spec import NvmeofServiceSpec
@@ -14,6 +15,7 @@ from orchestrator import (
     HostSpec,
 )
 from .cephadmservice import CephadmDaemonDeploySpec, CephService
+from ..configchecks import HostFacts
 from .service_registry import register_cephadm_service
 from .. import utils
 
@@ -78,15 +80,26 @@ class NvmeofService(CephService):
             'iobuf_options': iobuf_options,
             'rados_id': rados_id
         }
+        self.mgr.log.info(f'VALLARI_DEBUG: 1: {spec.default_listener_subnet_cidr=} {spec.default_listener_port=}')
         if spec.default_listener_subnet_cidr:
-            self.mgr.log.info(f'VALLARI_DEBUG: {spec.default_listener_subnet_cidr=}')
+            self.mgr.log.info(f'VALLARI_DEBUG: 2: {spec.default_listener_subnet_cidr=}')
             # step 1: find this host's address which is part of default_listener_subnet_cidr
-            listener_addr = ""
+            # subnet = _is_subnet_address(spec.default_listener_subnet_cidr)
+            # try 1
+            host = HostFacts()
+            host.load_facts(self.mgr.cache.facts[daemon_spec.host])
+            listener_addr = host.subnet_to_ip(spec.default_listener_subnet_cidr)
+            # try 2: listener_addr = self.mgr.inventory.  find_ip_on_host(daemon_spec.host, subnet) #find_ip_on_host 
+            self.mgr.log.info(f'VALLARI_DEBUG: 3: {listener_addr=}')
             # step 2: validate address
-            self._check_valid_addr(daemon_spec.host, listener_addr)
-            context['default_listener'] = listener_addr
+            # self._check_valid_addr(daemon_spec.host, listener_addr)
+            if listener_addr:
+                self.mgr.log.info(f'VALLARI_DEBUG: 4: listener_addr here')
+                if self.mgr.inventory.is_valid_ip(listener_addr):
+                    self.mgr.log.info(f'VALLARI_DEBUG: 5: mgr.inventory.is_valid_ip')
+                    context['default_listener'] = listener_addr
         if spec.default_listener_port:
-            self.mgr.log.info(f'VALLARI_DEBUG: {spec.default_listener_port=}')
+            self.mgr.log.info(f'VALLARI_DEBUG: 6: {spec.default_listener_port=}')
             context['default_listener_port'] = spec.default_listener_port
         gw_conf = self.mgr.template.render('services/nvmeof/ceph-nvmeof.conf.j2', context)
 
@@ -130,6 +143,27 @@ class NvmeofService(CephService):
         daemon_spec.final_config, daemon_spec.deps = self.generate_config(daemon_spec)
         daemon_spec.deps = []
         return daemon_spec
+
+    def subnet_to_ip(self, host: str, subnet: str) -> Optional[str]:
+        ip_version = ip_network(subnet).version
+        logger.debug(f"subnet {subnet} is IP version {ip_version}")
+        networks = self.mgr.cache.networks.get(host, {})
+        # interfaces = cast(Dict[str, Dict[str, Any]], self.interfaces)
+        ipaddr = None
+        for subnet, ifaces in networks.items():
+        
+        # for iface in interfaces.keys():
+            addr = ''
+            if ip_version == 4:
+                addr = interfaces[iface].get('ipv4_address', '')
+            else:
+                addr = interfaces[iface].get('ipv6_address', '')
+            if addr:
+                a = addr.split('/')[0]
+                if ip_address(a) in ip_network(subnet):
+                    ipaddr = a
+                    break
+        return ipaddr
 
     def daemon_check_post(self, daemon_descrs: List[DaemonDescription]) -> None:
         """ Overrides the daemon_check_post to add nvmeof gateways safely
