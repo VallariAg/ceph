@@ -67,6 +67,26 @@ class NvmeofService(CephService):
         self.mgr.log.info(f"gateway address: {addr} from {map_addr=} {spec.addr=} {host_ip=}")
         discovery_addr = map_discovery_addr or spec.discovery_addr or host_ip
         self.mgr.log.info(f"discovery address: {discovery_addr} from {map_discovery_addr=} {spec.discovery_addr=} {host_ip=}")
+ 
+        default_listeners = spec.default_listeners # "172.17.0.0/16:3000"
+        self.mgr.log.info(f'VALLARI_DEBUG: 0: {default_listeners=}')
+        if default_listeners:
+            self.mgr.log.info(f'VALLARI_DEBUG: 1: default_listenrse here!') 
+            listeners_ip = ""
+            for listeners_subnets in default_listeners.split(','):
+                self.mgr.log.info(f'VALLARI_DEBUG: 2: {listeners_subnets=}')
+                subnet, port = listeners_subnets.rsplit(':', 1)
+                self.mgr.log.info(f'VALLARI_DEBUG: 3: {subnet=} {port=}')
+                ip = self.subnet_to_ip(daemon_spec.host, subnet)
+                self.mgr.log.info(f'VALLARI_DEBUG: 4: {ip=}')
+                if ip:
+                    self.mgr.log.info(f'VALLARI_DEBUG: 5: {ip=} exists!!')
+                    # verify ip exists
+                    if self.mgr.inventory.is_valid_ip(ip):
+                        self.mgr.log.info(f'VALLARI_DEBUG: 6: validated {ip=} {self.mgr.inventory.is_valid_ip(ip)=}')
+                        listeners_ip += ip + ":" + port
+            default_listeners = listeners_ip
+            self.mgr.log.info(f'VALLARI_DEBUG: 7: finally {default_listeners=}')    
         context = {
             'spec': spec,
             'name': name,
@@ -78,32 +98,9 @@ class NvmeofService(CephService):
             'rpc_socket_name': 'spdk.sock',
             'transport_tcp_options': transport_tcp_options,
             'iobuf_options': iobuf_options,
-            'rados_id': rados_id
+            'rados_id': rados_id,
+            'default_listeners': default_listeners
         }
-        networks = self.mgr.cache.networks.get(daemon_spec.host, {})
-        self.mgr.log.info(f'VALLARI_DEBUG: 0: {networks}')
-        self.mgr.log.info(f'VALLARI_DEBUG: 1: {spec.default_listener_subnet_cidr=} {spec.default_listener_port=}')
-        if spec.default_listener_subnet_cidr:
-            self.mgr.log.info(f'VALLARI_DEBUG: 2: {spec.default_listener_subnet_cidr=}')
-            # step 1: find this host's address which is part of default_listener_subnet_cidr
-            # subnet = _is_subnet_address(spec.default_listener_subnet_cidr)
-            # try 1
-            host = HostFacts()
-            host.load_facts(self.mgr.cache.facts[daemon_spec.host])
-            # listener_addr = host.subnet_to_ip(spec.default_listener_subnet_cidr)
-            listener_addr = ""
-            # try 2: listener_addr = self.mgr.inventory.  find_ip_on_host(daemon_spec.host, subnet) #find_ip_on_host 
-            self.mgr.log.info(f'VALLARI_DEBUG: 3: {listener_addr=}')
-            # step 2: validate address
-            # self._check_valid_addr(daemon_spec.host, listener_addr)
-            if listener_addr:
-                self.mgr.log.info(f'VALLARI_DEBUG: 4: listener_addr here')
-                if self.mgr.inventory.is_valid_ip(listener_addr):
-                    self.mgr.log.info(f'VALLARI_DEBUG: 5: mgr.inventory.is_valid_ip')
-                    context['default_listener'] = listener_addr
-        if spec.default_listener_port:
-            self.mgr.log.info(f'VALLARI_DEBUG: 6: {spec.default_listener_port=}')
-            context['default_listener_port'] = spec.default_listener_port
         gw_conf = self.mgr.template.render('services/nvmeof/ceph-nvmeof.conf.j2', context)
 
         daemon_spec.keyring = keyring
@@ -147,30 +144,22 @@ class NvmeofService(CephService):
         daemon_spec.deps = []
         return daemon_spec
 
-    # def subnet_to_ip(self, host: str, subnet: str) -> Optional[str]:
-    #     ip_version = ip_network(subnet).version
-    #     ip_subnet = ip_network(subnet)
-    #     logger.debug(f"subnet {subnet} is IP version {ip_version}")
-    #     networks = self.mgr.cache.networks.get(host, {})
-    #     # interfaces = cast(Dict[str, Dict[str, Any]], self.interfaces)
-    #     ipaddr = None
-    #     for subnet, ifaces in networks.items():
-    #         interface = list(ifaces.keys())[0]
-    #         for ip_addr in ifaces[interface]:
-
-        
-    #     # for iface in interfaces.keys():
-    #         # addr = ''
-    #         # if ip_version == 4:
-    #         #     addr = interfaces[iface].get('ipv4_address', '')
-    #         # else:
-    #         #     addr = interfaces[iface].get('ipv6_address', '')
-    #         # if addr:
-    #         #     a = addr.split('/')[0]
-    #         #     if ip_address(a) in ip_network(subnet):
-    #         #         ipaddr = a
-    #         #         break
-    #     return ipaddr
+    def subnet_to_ip(self, host: str, subnet: str) -> Optional[str]:
+        ip_subnet = ip_network(subnet)
+        self.mgr.log.info(f'VALLARI_DEBUG: 3.1: {ip_subnet=}')
+        networks = self.mgr.cache.networks.get(host, {})
+        logger.debug(f"VALLARI_DEBUG: 3.2 networks {networks}")
+        ipaddr = None
+        for n_subnet, n_ifaces in networks.items(): 
+            self.mgr.log.info(f'VALLARI_DEBUG: 3.3: {n_subnet=} {n_ifaces=} {ip_network(n_subnet)=}')
+            if ip_network(n_subnet) == ip_subnet and n_ifaces:
+                self.mgr.log.info(f'VALLARI_DEBUG: 3.4: ip subnets match!')
+                # n_ifaces = {'iface': ['ipaddr'], }
+                iface = list(n_ifaces.keys())[0]
+                self.mgr.log.info(f'VALLARI_DEBUG: 3.5: {iface=} {n_ifaces[iface]=}')
+                ipaddr = n_ifaces[iface][0] if n_ifaces[iface] else None
+        self.mgr.log.info(f'VALLARI_DEBUG: 3.6: {ipaddr=}') 
+        return ipaddr
 
     def daemon_check_post(self, daemon_descrs: List[DaemonDescription]) -> None:
         """ Overrides the daemon_check_post to add nvmeof gateways safely
