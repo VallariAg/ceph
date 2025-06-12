@@ -80,6 +80,23 @@ class HostFacts:
                     break
         return nic
 
+    def subnet_to_ip(self, subnet: str) -> Optional[str]:
+        ip_version = ipaddress.ip_network(subnet).version
+        logger.debug(f"subnet {subnet} is IP version {ip_version}")
+        interfaces = cast(Dict[str, Dict[str, Any]], self.interfaces)
+        ipaddr = None
+        for iface in interfaces.keys():
+            addr = ''
+            if ip_version == 4:
+                addr = interfaces[iface].get('ipv4_address', '')
+            else:
+                addr = interfaces[iface].get('ipv6_address', '')
+            if addr:
+                a = addr.split('/')[0]
+                if ipaddress.ip_address(a) in ipaddress.ip_network(subnet):
+                    ipaddr = a
+                    break
+        return ipaddr
 
 class SubnetLookup:
     def __init__(self, subnet: str, hostname: str, mtu: str, speed: str):
