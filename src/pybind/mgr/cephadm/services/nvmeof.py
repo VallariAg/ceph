@@ -66,16 +66,18 @@ class NvmeofService(CephService):
         discovery_addr = map_discovery_addr or spec.discovery_addr or host_ip
         self.mgr.log.info(f"discovery address: {discovery_addr} from {map_discovery_addr=} {spec.discovery_addr=} {host_ip=}")
  
-        default_listeners = spec.default_listeners # "172.17.0.0/16:3000"
+        default_listeners = spec.default_listeners # "172.17.0.0:3000"
         self.mgr.log.info(f'VALLARI_DEBUG: 0: {default_listeners=}')
         if default_listeners:
             self.mgr.log.info(f'VALLARI_DEBUG: 1: default_listenrse here!') 
             listeners_ip = ""
             for listeners_subnets in default_listeners.split(','):
                 self.mgr.log.info(f'VALLARI_DEBUG: 2: {listeners_subnets=}')
-                subnet, port = listeners_subnets.rsplit(':', 1)
-                self.mgr.log.info(f'VALLARI_DEBUG: 3: {subnet=} {port=}')
-                ip = self.subnet_to_ip(daemon_spec.host, subnet)
+                ip_format, port = listeners_subnets.rsplit(':', 1)
+                self.mgr.log.info(f'VALLARI_DEBUG: 3: {ip_format=} {port=}')
+                if ip_format.count(".") == 4:
+                    ip_format = ip_format.rsplit(".", 1)
+                ip = self.get_matching_host_ip(daemon_spec.host, ip_format)
                 self.mgr.log.info(f'VALLARI_DEBUG: 4: {ip=}')
                 if ip:
                     self.mgr.log.info(f'VALLARI_DEBUG: 5: {ip=} exists!!')
@@ -142,21 +144,21 @@ class NvmeofService(CephService):
         daemon_spec.deps = []
         return daemon_spec
 
-    def subnet_to_ip(self, host: str, subnet: str) -> Optional[str]:
-        ip_subnet = ip_network(subnet)
-        self.mgr.log.info(f'VALLARI_DEBUG: 3.1: {ip_subnet=}')
+    def get_matching_host_ip(self, host: str, ip_format: str) -> Optional[str]:
+        logger.debug(f"VALLARI_DEBUG: 3.0 {host=} {ip_format=}")
         networks = self.mgr.cache.networks.get(host, {})
-        logger.debug(f"VALLARI_DEBUG: 3.2 networks {networks}")
+        logger.debug(f"VALLARI_DEBUG: 3.1 networks {networks=}")
         ipaddr = None
         for n_subnet, n_ifaces in networks.items(): 
-            self.mgr.log.info(f'VALLARI_DEBUG: 3.3: {n_subnet=} {n_ifaces=} {ip_network(n_subnet)=}')
-            if ip_network(n_subnet) == ip_subnet and n_ifaces:
-                self.mgr.log.info(f'VALLARI_DEBUG: 3.4: ip subnets match!')
-                # n_ifaces = {'iface': ['ipaddr'], }
-                iface = list(n_ifaces.keys())[0]
-                self.mgr.log.info(f'VALLARI_DEBUG: 3.5: {iface=} {n_ifaces[iface]=}')
-                ipaddr = n_ifaces[iface][0] if n_ifaces[iface] else None
-        self.mgr.log.info(f'VALLARI_DEBUG: 3.6: {ipaddr=}') 
+            self.mgr.log.info(f'VALLARI_DEBUG: 3.2: {n_subnet=} {n_ifaces=} {ip_network(n_subnet)=}')
+            if ip_network(n_subnet).version != "4":
+                continue
+            for ip_list in n_ifaces.values():
+                self.mgr.log.info(f'VALLARI_DEBUG: 3.3: {ip_list=}')
+                for ip in ip_list:
+                    self.mgr.log.info(f'VALLARI_DEBUG: 3.4: {ip=}')
+                    if ip.startswith(ip_format):
+                        ipaddr = ip
         return ipaddr
 
     def daemon_check_post(self, daemon_descrs: List[DaemonDescription]) -> None:
