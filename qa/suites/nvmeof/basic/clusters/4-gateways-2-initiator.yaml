@@ -7,11 +7,11 @@ roles:
   - osd.0
   - client.2
   - ceph.nvmeof.nvmeof.a
-- - host.b
-  - mon.b
-  - osd.1
-  - client.3
-  - ceph.nvmeof.nvmeof.b
+# - - host.b
+#   - mon.b
+#   - osd.1
+#   - client.3
+#   - ceph.nvmeof.nvmeof.b
 # - - host.c
 #   - mon.c
 #   - osd.2
