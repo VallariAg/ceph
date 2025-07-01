@@ -1,6 +1,6 @@
 roles:
-- - client.0
-- - client.1
+# - - client.0
+# - - client.1
 - - host.a
   - mon.a
   - mgr.x
@@ -12,15 +12,15 @@ roles:
   - osd.1
   - client.3
   - ceph.nvmeof.nvmeof.b
-- - host.c
-  - mon.c
-  - osd.2
-  - client.4
-  - ceph.nvmeof.nvmeof.c
-- - host.d
-  - osd.3
-  - client.5
-  - ceph.nvmeof.nvmeof.d
+# - - host.c
+#   - mon.c
+#   - osd.2
+#   - client.4
+#   - ceph.nvmeof.nvmeof.c
+# - - host.d
+#   - osd.3
+#   - client.5
+#   - ceph.nvmeof.nvmeof.d
 
 overrides:
   ceph:
