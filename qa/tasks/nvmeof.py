@@ -114,17 +114,23 @@ class Nvmeof(Task):
                 'rbd', 'pool', 'init', poolname
             ])
 
-            group_to_nodes = defaultdict(list)
-            for index, node in enumerate(nodes):
-                group_name = self.groups_prefix + str(index % int(self.groups_count))
-                group_to_nodes[group_name] += [node]
-            for group_name in group_to_nodes:
-                gp_nodes = group_to_nodes[group_name]
-                log.info(f'[nvmeof]: ceph orch apply nvmeof {poolname} {group_name}')
-                _shell(self.ctx, self.cluster_name, self.remote, [
-                    'ceph', 'orch', 'apply', 'nvmeof', poolname, group_name,
-                    '--placement', ';'.join(gp_nodes)
-                ])
+            log.info(f'[nvmeof]: ceph orch apply nvmeof {poolname}')
+            _shell(self.ctx, self.cluster_name, self.remote, [
+                'ceph', 'orch', 'apply', 'nvmeof', poolname, f'mygroup0'
+                '--placement', str(len(nodes)) + ';' + ';'.join(nodes)
+            ])
+
+            # group_to_nodes = defaultdict(list)
+            # for index, node in enumerate(nodes):
+            #     group_name = self.groups_prefix + str(index % int(self.groups_count))
+            #     group_to_nodes[group_name] += [node]
+            # for group_name in group_to_nodes:
+            #     gp_nodes = group_to_nodes[group_name]
+            #     log.info(f'[nvmeof]: ceph orch apply nvmeof {poolname} {group_name}')
+            #     _shell(self.ctx, self.cluster_name, self.remote, [
+            #         'ceph', 'orch', 'apply', 'nvmeof', poolname, group_name,
+            #         '--placement', ';'.join(gp_nodes)
+            #     ])
 
             total_images = int(self.namespaces_count) * int(self.subsystems_count)
             log.info(f'[nvmeof]: creating {total_images} images')
@@ -215,12 +221,12 @@ class Nvmeof(Task):
         _shell(self.ctx, self.cluster_name, self.remote, [
             'ceph', 'orch', 'host', 'ls'
         ])
-        for i in range(self.groups_count):
-            group_name = self.groups_prefix + str(i)
-            service_name = f"nvmeof.{self.poolname}.{group_name}"
-            _shell(self.ctx, self.cluster_name, self.remote, [
-                'ceph', 'orch', 'rm', service_name
-            ])
+        # for i in range(self.groups_count):
+            # group_name = self.groups_prefix + str(i)
+        service_name = f"nvmeof.{self.poolname}.mygroup0"
+        _shell(self.ctx, self.cluster_name, self.remote, [
+            'ceph', 'orch', 'rm', service_name            
+        ])
         _shell(self.ctx, self.cluster_name, self.remote, [
             'ceph', 'orch', 'host', 'ls'
         ])
