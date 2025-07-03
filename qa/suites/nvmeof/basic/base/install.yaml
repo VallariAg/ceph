@@ -4,7 +4,7 @@ tasks:
     extra_packages:
         - nvme-cli
 - cephadm:
-    image: quay.ceph.io/ceph-ci/ceph:main
+    image: quay.ceph.io/ceph-ci/ceph:f768b9273887b71fd09e1c92ebbe6cced3dd26c8
 - cephadm.shell:
     host.a:
     # get state before nvmeof deployment
