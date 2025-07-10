@@ -80,6 +80,7 @@ class NVMeoFTop:
         return ''.join(rows) 
 
     def batch_mode(self) -> None:
+        # assert self.args.get('subsystem')
         logger.info(f"Running in batch mode querying {self.args.get('subsystem')}")
         # event = threading.Event()
         rt_stdout = ""
@@ -144,12 +145,15 @@ class NVMeoFTop:
         # else:
             # self.console_mode()
 
+# class NVMeoFTopCommand:
+    # top_tool = None
+    # TODO: this is not being reset when command is reran. 
+    # We want to create new NVMeoFTop for every new command session 
 
 @CLIReadCommand('nvmeof top', poll=True)
-def nvmeof_top(_, subsystem: str, server_addr: str, group: str,
-               delay: int = 30, count: int = 0, duration: int = 30, 
-               with_timestamp: bool = False, no_headings: bool = False, 
-               skip_version_check: bool = False):
+def nvmeof_top(_, subsystem: str, server_addr: str, group: str, refresh: bool,
+            delay: int = 5, count: int = 0, duration: int = 30, 
+            with_timestamp: bool = False, no_headings: bool = False):
     '''
     NVMe-oF Top Tool
     --subsystem 
@@ -169,20 +173,29 @@ def nvmeof_top(_, subsystem: str, server_addr: str, group: str,
         'duration': duration,
         'with_timestamp': with_timestamp,
         'no_headings': no_headings, 
-        'skip_version_check': skip_version_check,
+        # 'skip_version_check': skip_version_check,
         # TODO: temporary args to use in NVMeoFClient
         'server_addr': server_addr,
         'group': group,
     }
-    logger.info("VALLARI_DEBUG: new loop???")
+    logger.info(f"VALLARI_DEBUG: new loop???")
+    # logger.info(f"VALLARI_DEBUG: what is here {self=}")
     if server_addr and group:
         gateway_client = NVMeoFClient(gw_group=group, traddr=server_addr) # TODO: gw_group? traddr?
     elif server_addr:
         gateway_client = NVMeoFClient(traddr=server_addr) # TODO: gw_group? traddr?
     else:
         gateway_client = NVMeoFClient()
-    app = NVMeoFTop(args, gateway_client)
-    ret = app.run()
+
+    top_tool = NVMeoFTop(args, gateway_client) 
+    ret = top_tool.run()
+    # if NVMeoFTopCommand.top_tool is None:
+    #     NVMeoFTopCommand.top_tool = NVMeoFTop(args, gateway_client)
+    #     ret = "NEW"
+    #     ret += NVMeoFTopCommand.top_tool.run()
+    # else:
+    #     ret = "CONTINUED"
+    #     ret += NVMeoFTopCommand.top_tool.batch_mode()
     return HandleCommandResult(stdout=ret)
 
 
@@ -193,7 +206,7 @@ class Health:
         self.msg = ''
 
 
-class Counter:
+class Counter: # TODO: these needs to be saved for each interation 
     def __init__(self):
         self.current = 0.0
         self.last = 0.0
@@ -351,12 +364,6 @@ class Collector:
     def reactor_cores(self) -> int:
         return len(self.thread_stats.keys())
 
-    # def reset_namespace_data(self):
-    #     logger.debug("resetting namespace and io counters due to subsystem change")
-    #     self._sample_count = 0
-    #     del self.namespaces[:]   # Clear the list of namespace objects
-    #     self.iostats.clear()
-
     def log_connection(self):
         logger.info(f"Connected to {self.parent.args.get('server_addr')}")
         logger.info(f"Gateway has {self.total_subsystems} subsystems defined")
@@ -414,22 +421,22 @@ class DataCollector(Collector):
     event = threading.Event()
 
     def initialise(self):
-        self.set_gw_info()
-        if self.health.rc > 0:
-            logger.error('Unable to retrieve gataway information')
-            return
+        # self.set_gw_info()
+        # if self.health.rc > 0:
+        #     logger.error('Unable to retrieve gataway information')
+        #     return
 
-        if self.parent.args.get('skip_version_check'):
-            logger.info('Skipped version check requested. Potential for grpc inconsistency')
-        else:
-            gw_ok, msg = valid_gw_version(self.gw_info.version)
-            if not gw_ok:
-                logger.error(msg)
-                self.health.rc = 8
-                self.health.msg = msg
-                return
-            else:
-                logger.debug(f"Gateway version {self.gw_info.version} passed version check")
+        # if self.parent.args.get('skip_version_check'):
+        #     logger.info('Skipped version check requested. Potential for grpc inconsistency')
+        # else:
+        #     gw_ok, msg = valid_gw_version(self.gw_info.version)
+        #     if not gw_ok:
+        #         logger.error(msg)
+        #         self.health.rc = 8
+        #         self.health.msg = msg
+        #         return
+        #     else:
+        #         logger.debug(f"Gateway version {self.gw_info.version} passed version check")
 
         self.subsystems = self._get_all_subsystems()
         if self.subsystems.status > 0:
@@ -547,25 +554,28 @@ class DataCollector(Collector):
     async def start(self):
         logger.info("VALLARI_DEBUG: collector.start")
         # while not self.event.is_set():
-        with self.lock:
-            logger.info("VALLARI_DEBUG: collector.start.locked")
+        for i in range(2):
             start = time.time()
             await self.collect_data()
-            logger.info(f"data collection took: {(time.time() - start):3.3f} secs")
+            logger.info(f"data collection took (round {i+1}): {(time.time() - start):3.3f} secs")
 
             if not self.ready:
                 logger.error("Error encounted during data collection, terminating async loop")
                 return
             self.timestamp = time.time()
-            # logger.debug(f"event loop waiting for {self.parent.delay}s")
             logger.debug(f"nqn_list is : {self.nqn_list}")
-            await asyncio.sleep(self.parent.delay)
-            logger.info("VALLARI_DEBUG: collector.start.locked sleep over")
+            if i == 0:
+                logger.info("VALLARI_DEBUG: going to sleep")
+                await asyncio.sleep(self.parent.delay)  
+                logger.info("VALLARI_DEBUG: slept!")
 
     def run(self):
         logger.info("VALLARI_DEBUG: DataCollector.run")
         if self.ready:
-            asyncio.run(self.start())
+            with self.lock:
+                logger.info("VALLARI_DEBUG: collector.start.locked")
+                asyncio.run(self.start())
+                logger.info("VALLARI_DEBUG: collector.start.locked sleep over")
 
     # async def start(self):
     #     # while not self.event.is_set():
