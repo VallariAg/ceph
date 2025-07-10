@@ -1,0 +1,719 @@
+{
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "showIn": 0,
+          "tags": [],
+          "type": "dashboard"
+        }
+      ]
+    },
+    "description": "Ceph NVMe-oF gateways overview",
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 0,
+    "id": 24,
+    "links": [
+      {
+        "asDropdown": true,
+        "icon": "external link",
+        "includeVars": true,
+        "keepTime": true,
+        "tags": [],
+        "targetBlank": false,
+        "title": "Browse Dashboards",
+        "tooltip": "",
+        "type": "dashboards",
+        "url": ""
+      }
+    ],
+    "panels": [
+      {
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        },
+        "id": 12,
+        "panels": [],
+        "title": "Performance by Gateways - $group group/s",
+        "type": "row"
+      },
+      {
+        "datasource": "$datasource",
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 8,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green"
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "percentunit"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 1
+        },
+        "id": 3,
+        "interval": "1m",
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "hideZeros": false,
+            "maxHeight": 600,
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "pluginVersion": "11.6.0",
+        "targets": [
+          {
+            "datasource": "$datasource",
+            "expr": "avg by(instance) (rate(ceph_nvmeof_reactor_seconds_total{mode='busy',instance=~'$gateway'}[1m]))",
+            "format": "",
+            "instant": false,
+            "intervalFactor": 1,
+            "legendFormat": "{{name}}",
+            "range": true,
+            "refId": "A"
+          }
+        ],
+        "title": "AVG Reactor CPU Usage",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "$datasource",
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 8,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green"
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "percentunit"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 8,
+          "y": 1
+        },
+        "id": 4,
+        "interval": "1m",
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "hideZeros": false,
+            "maxHeight": 600,
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "pluginVersion": "11.6.0",
+        "targets": [
+          {
+            "datasource": "$datasource",
+            "editorMode": "code",
+            "expr": "avg by (instance) (rate(ceph_nvmeof_reactor_seconds_total{mode='busy', instance=~'$gateway.*'}[1m]))\n",
+            "format": "",
+            "instant": false,
+            "intervalFactor": 1,
+            "legendFormat": "{{name}}",
+            "range": true,
+            "refId": "A"
+          }
+        ],
+        "title": "Reactor Threads CPU Usage",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "$datasource",
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 8,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green"
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "s"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 16,
+          "y": 1
+        },
+        "id": 5,
+        "interval": "30s",
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "hideZeros": false,
+            "maxHeight": 600,
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "pluginVersion": "11.6.0",
+        "targets": [
+          {
+            "datasource": "$datasource",
+            "editorMode": "code",
+            "expr": "avg((rate(ceph_nvmeof_bdev_read_seconds_total{instance=~'$gateway'}[30s]) / rate(ceph_nvmeof_bdev_reads_completed_total{instance=~'$gateway'}[30s])) > 0)\n",
+            "format": "time_series",
+            "instant": false,
+            "intervalFactor": 1,
+            "legendFormat": "Reads",
+            "range": true,
+            "refId": "A"
+          },
+          {
+            "datasource": "$datasource",
+            "expr": "avg((rate(ceph_nvmeof_bdev_write_seconds_total{instance=~'$gateway'}[30s]) / rate(ceph_nvmeof_bdev_writes_completed_total{instance=~'$gateway'}[30s])) > 0)",
+            "format": "time_series",
+            "instant": false,
+            "intervalFactor": 1,
+            "legendFormat": "Writes",
+            "range": true,
+            "refId": "B"
+          }
+        ],
+        "title": "AVG I/O Latency",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "$datasource",
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 8,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green"
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "locale"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 9
+        },
+        "id": 6,
+        "interval": "1m",
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "hideZeros": false,
+            "maxHeight": 600,
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "pluginVersion": "11.6.0",
+        "targets": [
+          {
+            "datasource": "$datasource",
+            "editorMode": "code",
+            "expr": "sum by(instance) (rate(ceph_nvmeof_bdev_reads_completed_total{instance=~'$gateway'}[1m]))",
+            "format": "time_series",
+            "instant": false,
+            "intervalFactor": 1,
+            "legendFormat": "__auto",
+            "range": true,
+            "refId": "A"
+          }
+        ],
+        "title": "Read IOPS by Gateway",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "$datasource",
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 8,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green"
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "locale"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 8,
+          "y": 9
+        },
+        "id": 17,
+        "interval": "1m",
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "hideZeros": false,
+            "maxHeight": 600,
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "pluginVersion": "11.6.0",
+        "targets": [
+          {
+            "datasource": "$datasource",
+            "editorMode": "code",
+            "expr": "sum by(instance) (rate(ceph_nvmeof_bdev_writes_completed_total{instance=~'$gateway'}[1m]))",
+            "format": "time_series",
+            "instant": false,
+            "intervalFactor": 1,
+            "legendFormat": "__auto",
+            "range": true,
+            "refId": "A"
+          }
+        ],
+        "title": "Write IOPS by Gateway",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "$datasource",
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 8,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green"
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "binBps"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 16,
+          "y": 9
+        },
+        "id": 9,
+        "interval": "1m",
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "hideZeros": false,
+            "maxHeight": 600,
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "pluginVersion": "11.6.0",
+        "targets": [
+          {
+            "datasource": "$datasource",
+            "expr": "sum by(instance) (rate(ceph_nvmeof_bdev_read_bytes_total{instance=~'$gateway'}[1m]) + rate(ceph_nvmeof_bdev_written_bytes_total{instance=~'$gateway'}[1m]))",
+            "format": "time_series",
+            "instant": false,
+            "intervalFactor": 1,
+            "legendFormat": "{{name}}",
+            "range": true,
+            "refId": "A"
+          }
+        ],
+        "title": "Throughput by Gateway",
+        "type": "timeseries"
+      }
+    ],
+    "preload": false,
+    "refresh": "10s",
+    "schemaVersion": 41,
+    "tags": [
+      "ceph-mixin"
+    ],
+    "templating": {
+      "list": [
+        {
+          "current": {
+            "text": "default",
+            "value": "default"
+          },
+          "label": "Data Source",
+          "name": "datasource",
+          "options": [],
+          "query": "prometheus",
+          "refresh": 1,
+          "regex": "",
+          "type": "datasource"
+        },
+        {
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "datasource": "$datasource",
+          "includeAll": false,
+          "label": "cluster",
+          "name": "cluster",
+          "options": [],
+          "query": "label_values(ceph_health_status, cluster)",
+          "refresh": 1,
+          "regex": "(.*)",
+          "sort": 1,
+          "type": "query"
+        },
+        {
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "datasource": "$datasource",
+          "includeAll": true,
+          "label": "Gateway Group",
+          "name": "group",
+          "options": [],
+          "query": "label_values(ceph_nvmeof_gateway_info,group)",
+          "refresh": 2,
+          "regex": "",
+          "type": "query"
+        },
+        {
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "datasource": "$datasource",
+          "includeAll": true,
+          "label": "Gateway Hostname",
+          "name": "gateway",
+          "options": [],
+          "query": "label_values(ceph_nvmeof_gateway_info{group=~'$group'},hostname)",
+          "refresh": 2,
+          "regex": "",
+          "type": "query"
+        }
+      ]
+    },
+    "time": {
+      "from": "now-15m",
+      "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "Ceph NVMe-oF Gateways - Performance by Gateway",
+    "uid": "feeuv1dno43r4deeaadsss7",
+    "version": 3
+  }

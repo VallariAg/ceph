@@ -1,0 +1,701 @@
+{
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "showIn": 0,
+          "tags": [],
+          "type": "dashboard"
+        }
+      ]
+    },
+    "description": "Ceph NVMe-oF gateways overview",
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 0,
+    "id": 25,
+    "links": [
+      {
+        "asDropdown": true,
+        "icon": "external link",
+        "includeVars": true,
+        "keepTime": true,
+        "tags": [],
+        "targetBlank": false,
+        "title": "Browse Dashboards",
+        "tooltip": "",
+        "type": "dashboards",
+        "url": ""
+      }
+    ],
+    "panels": [
+      {
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        },
+        "id": 2,
+        "panels": [],
+        "title": "Performance by Subsystem - $subsystem",
+        "type": "row"
+      },
+      {
+        "datasource": "$datasource",
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 8,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green"
+                }
+              ]
+            },
+            "unit": "locale"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 8,
+          "x": 0,
+          "y": 1
+        },
+        "id": 7,
+        "interval": "1m",
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "hideZeros": false,
+            "maxHeight": 600,
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "pluginVersion": "11.6.0",
+        "targets": [
+          {
+            "datasource": "$datasource",
+            "editorMode": "code",
+            "expr": "sum by(nqn) ((rate(ceph_nvmeof_bdev_reads_completed_total[1m])) * on(instance,bdev_name) group_right ceph_nvmeof_subsystem_namespace_metadata{nqn=~'$subsystem'})",
+            "format": "time_series",
+            "instant": false,
+            "intervalFactor": 1,
+            "legendFormat": "__auto",
+            "range": true,
+            "refId": "A"
+          }
+        ],
+        "title": "Read IOPS by NVMe-oF Subsystem",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "$datasource",
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 8,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green"
+                }
+              ]
+            },
+            "unit": "locale"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 8,
+          "x": 8,
+          "y": 1
+        },
+        "id": 18,
+        "interval": "60s",
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "hideZeros": false,
+            "maxHeight": 600,
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "pluginVersion": "11.6.0",
+        "targets": [
+          {
+            "datasource": "$datasource",
+            "editorMode": "code",
+            "expr": "sum by(nqn) (rate(ceph_nvmeof_bdev_writes_completed_total[1m]) * on(instance,bdev_name) group_right ceph_nvmeof_subsystem_namespace_metadata{nqn=~'$subsystem'})",
+            "format": "time_series",
+            "instant": false,
+            "intervalFactor": 1,
+            "legendFormat": "__auto",
+            "range": true,
+            "refId": "A"
+          }
+        ],
+        "title": "Write IOPS by NVMe-oF Subsystem",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "$datasource",
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 8,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green"
+                }
+              ]
+            },
+            "unit": "binBps"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 8,
+          "x": 16,
+          "y": 1
+        },
+        "id": 10,
+        "interval": "1m",
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "hideZeros": false,
+            "maxHeight": 600,
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "pluginVersion": "11.6.0",
+        "targets": [
+          {
+            "datasource": "$datasource",
+            "editorMode": "code",
+            "expr": "sum by(nqn) ((rate(ceph_nvmeof_bdev_read_bytes_total[1m]) + rate(ceph_nvmeof_bdev_written_bytes_total[1m])) * on(instance,bdev_name) group_right ceph_nvmeof_subsystem_namespace_metadata{nqn=~'$subsystem'})",
+            "format": "time_series",
+            "instant": false,
+            "intervalFactor": 1,
+            "legendFormat": "__auto",
+            "range": true,
+            "refId": "A"
+          }
+        ],
+        "title": "Throughput by NVMe-oF Subsystem",
+        "type": "timeseries"
+      },
+      {
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 10
+        },
+        "id": 13,
+        "panels": [],
+        "title": "Performance by namespaces of ($subsystem) subsystem/s",
+        "type": "row"
+      },
+      {
+        "datasource": "$datasource",
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 8,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green"
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "locale"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 8,
+          "x": 0,
+          "y": 11
+        },
+        "id": 16,
+        "interval": "1m",
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "hideZeros": false,
+            "maxHeight": 600,
+            "mode": "single",
+            "sort": "desc"
+          }
+        },
+        "pluginVersion": "11.6.0",
+        "targets": [
+          {
+            "datasource": "$datasource",
+            "editorMode": "code",
+            "expr": "sum by(pool_name, rbd_name, nsid, nqn) (rate(ceph_nvmeof_bdev_reads_completed_total[1m]) * on(instance, bdev_name) group_left(nqn, nsid) ceph_nvmeof_subsystem_namespace_metadata{nqn=~'$subsystem'})",
+            "format": "time_series",
+            "instant": false,
+            "intervalFactor": 1,
+            "legendFormat": "{{nqn}} - {{nsid}}",
+            "range": true,
+            "refId": "A"
+          }
+        ],
+        "title": "Reads IOPS by device for $subsystem",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "$datasource",
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 8,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "linear",
+              "lineStyle": {
+                "fill": "solid"
+              },
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green"
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "locale"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 8,
+          "x": 8,
+          "y": 11
+        },
+        "id": 8,
+        "interval": "1m",
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "hideZeros": false,
+            "maxHeight": 600,
+            "mode": "single",
+            "sort": "desc"
+          }
+        },
+        "pluginVersion": "11.6.0",
+        "targets": [
+          {
+            "datasource": "$datasource",
+            "editorMode": "code",
+            "exemplar": false,
+            "expr": "sum by(pool_name, rbd_name, nsid, nqn) (rate(ceph_nvmeof_bdev_writes_completed_total[1m]) * on(instance, bdev_name) group_left(nqn, nsid) ceph_nvmeof_subsystem_namespace_metadata{nqn=~'$subsystem'})",
+            "format": "time_series",
+            "instant": false,
+            "intervalFactor": 1,
+            "legendFormat": "{{nqn}} (nsid: {{nsid}})",
+            "range": true,
+            "refId": "A"
+          }
+        ],
+        "title": "Writre IOPS by device for $subsystem",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "$datasource",
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 8,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green"
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "binBps"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 8,
+          "x": 16,
+          "y": 11
+        },
+        "id": 11,
+        "interval": "1m",
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "hideZeros": false,
+            "maxHeight": 600,
+            "mode": "single",
+            "sort": "desc"
+          }
+        },
+        "pluginVersion": "11.6.0",
+        "targets": [
+          {
+            "datasource": "$datasource",
+            "editorMode": "code",
+            "expr": "sum by(pool_name, rbd_name, nqn, nsid) ((rate(ceph_nvmeof_bdev_read_bytes_total[1m]) + rate(ceph_nvmeof_bdev_written_bytes_total[1m])) * on(instance, bdev_name) group_left(nqn, nsid) ceph_nvmeof_subsystem_namespace_metadata{nqn=~'$subsystem'})",
+            "format": "time_series",
+            "instant": false,
+            "intervalFactor": 1,
+            "legendFormat": "{{nqn}} - {{nsid}}",
+            "range": true,
+            "refId": "A"
+          }
+        ],
+        "title": "Throughput by device for $subsystem",
+        "type": "timeseries"
+      }
+    ],
+    "preload": false,
+    "refresh": "10s",
+    "schemaVersion": 41,
+    "tags": [
+      "ceph-mixin"
+    ],
+    "templating": {
+      "list": [
+        {
+          "current": {
+            "text": "default",
+            "value": "default"
+          },
+          "label": "Data Source",
+          "name": "datasource",
+          "options": [],
+          "query": "prometheus",
+          "refresh": 1,
+          "regex": "",
+          "type": "datasource"
+        },
+        {
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "datasource": "$datasource",
+          "includeAll": false,
+          "label": "cluster",
+          "name": "cluster",
+          "options": [],
+          "query": "label_values(ceph_health_status, cluster)",
+          "refresh": 1,
+          "regex": "(.*)",
+          "sort": 1,
+          "type": "query"
+        },
+        {
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "datasource": "$datasource",
+          "includeAll": true,
+          "label": "Subsystem NQN",
+          "name": "subsystem",
+          "options": [],
+          "query": "label_values(ceph_nvmeof_subsystem_metadata,nqn)",
+          "refresh": 1,
+          "regex": "",
+          "type": "query"
+        }
+      ]
+    },
+    "time": {
+      "from": "now-3h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "Ceph NVMe-oF Gateways - Performance by Subsystem",
+    "uid": "feeuv1dno43r4deeaadsss3",
+    "version": 5
+  }
