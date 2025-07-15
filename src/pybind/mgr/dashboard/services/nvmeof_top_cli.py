@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
-# import errno
-# import json
 from typing import Dict, Tuple
 import threading
 import time
 import logging
-# import yaml
 import sys
 import grpc
 import asyncio
@@ -30,39 +27,17 @@ class NVMeoFTop:
         self.delay = args.get('delay')
         self.subsystem_nqn = args.get('subsystem')
         self.collector: DataCollector
-        # self.ui_loop: urwid.MainLoop
-
-        # these variables are used to hold the UI objects
-        # self.header: Header
-        # self.cpustats: CPUStats
-        # self.subsystem: SubsystemInfo
-        # self.namespaces: NamespaceTable
-
-        # self.cpu_per_core = False
-        # self.ui = None
-        # self.components = None
-        # self.options: Options
         self.sort_key = 'NSID'
-        # self.refresh_paused = False
-        # self.min_refresh_interval = 1
         self.reverse_sort = False
-
-        # self.help: HelpInformation
-        # self.read_latency_threshold = 0
-        # self.write_latency_threshold = 0
-        # self.ns_description_ptr = 0
 
     def to_stdout(self):
         """Dump namespace performance stats to stdout"""
         logger.debug("writing stats to stdout")
         sort_pos = NVMeoFTop.text_headers.index(self.sort_key)
         with self.collector.lock:
-            logger.info("VALLARI_DEBUG: collector.loc")
             ns_data = self.collector.get_sorted_namespaces(sort_pos=sort_pos)
-            # ns_data = self.collector.namespaces
 
         rows = []
-        logger.info(f"VALLARI_DEBUG: {ns_data=}")
         if self.args.get('with_timestamp'):
             tstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.collector.timestamp))
             rows.append(f"{tstamp}\n")
@@ -76,58 +51,22 @@ class NVMeoFTop:
         else:
             rows.append("<no namespaces defined>\n")
 
-        # print(''.join(rows), end='')
         return ''.join(rows) 
 
     def batch_mode(self) -> None:
-        # assert self.args.get('subsystem')
         logger.info(f"Running in batch mode querying {self.args.get('subsystem')}")
-        # event = threading.Event()
         rt_stdout = ""
         try:
             if not self.collector.ready:
                 abort(self.collector.health.rc, self.collector.health.msg)
 
-            # if self.collector.samples_ready:
             rt_stdout += self.to_stdout()
         except KeyboardInterrupt:
             logger.info("nvmeof-top stopped by user")
 
         rt_stdout += "\n ---- "
         return rt_stdout
-
-    # def batch_mode(self) -> None:
-    #     logger.info(f"Running in batch mode querying {self.args.get('subsystem')}")
-    #     event = threading.Event()
-    #     ctr = 0
-    #     rt_stdout = ""
-    #     try:
-    #         rt_stdout += "waiting for samples..."
-    #         end_time: Optional[float] = None
-    #         if self.args.get('duration'):
-    #             end_time = time.time() + self.args.get('duration')
-
-    #         while not event.is_set():
-    #             if not self.collector.ready:
-    #                 abort(self.collector.health.rc, self.collector.health.msg)
-
-    #             if self.collector.samples_ready:
-    #                 rt_stdout += self.to_stdout()
-    #                 if self.args.get('count'):
-    #                     ctr += 1
-    #                     if ctr > self.args.get('count'):
-    #                         logger.info('nvmeof-top stopped - iteration limit reached')
-    #                         break
-    #                 if end_time and time.time() > end_time:
-    #                     logger.info('nvmeof-top stopped - time limit reached')
-    #                     break
-    #             event.wait(self.delay)
-    #     except KeyboardInterrupt:
-    #         logger.info("nvmeof-top stopped by user")
-
-    #     rt_stdout += "\nnvmeof-top stopped."
-    #     return rt_stdout
-
+   
     def run(self) -> None:
         self.collector = DataCollector(self)
         logger.info(f"nvmeof-top running with a {self.collector.__class__.__name__} collector")
@@ -139,16 +78,9 @@ class NVMeoFTop:
         t = threading.Thread(target=self.collector.run, daemon=True)
         t.start()
 
-        # if self.args.get('batch'):
         assert self.args.get('subsystem')
         return self.batch_mode()
-        # else:
-            # self.console_mode()
 
-# class NVMeoFTopCommand:
-    # top_tool = None
-    # TODO: this is not being reset when command is reran. 
-    # We want to create new NVMeoFTop for every new command session 
 
 @CLIReadCommand('nvmeof top', poll=True)
 def nvmeof_top(_, subsystem: str, server_addr: str, group: str, refresh: bool,
@@ -173,13 +105,10 @@ def nvmeof_top(_, subsystem: str, server_addr: str, group: str, refresh: bool,
         'duration': duration,
         'with_timestamp': with_timestamp,
         'no_headings': no_headings, 
-        # 'skip_version_check': skip_version_check,
         # TODO: temporary args to use in NVMeoFClient
         'server_addr': server_addr,
         'group': group,
     }
-    logger.info(f"VALLARI_DEBUG: new loop???")
-    # logger.info(f"VALLARI_DEBUG: what is here {self=}")
     if server_addr and group:
         gateway_client = NVMeoFClient(gw_group=group, traddr=server_addr) # TODO: gw_group? traddr?
     elif server_addr:
@@ -189,13 +118,6 @@ def nvmeof_top(_, subsystem: str, server_addr: str, group: str, refresh: bool,
 
     top_tool = NVMeoFTop(args, gateway_client) 
     ret = top_tool.run()
-    # if NVMeoFTopCommand.top_tool is None:
-    #     NVMeoFTopCommand.top_tool = NVMeoFTop(args, gateway_client)
-    #     ret = "NEW"
-    #     ret += NVMeoFTopCommand.top_tool.run()
-    # else:
-    #     ret = "CONTINUED"
-    #     ret += NVMeoFTopCommand.top_tool.batch_mode()
     return HandleCommandResult(stdout=ret)
 
 
@@ -206,7 +128,7 @@ class Health:
         self.msg = ''
 
 
-class Counter: # TODO: these needs to be saved for each interation 
+class Counter: 
     def __init__(self):
         self.current = 0.0
         self.last = 0.0
@@ -288,7 +210,6 @@ class Collector:
         self.subsystem_nqn = self.parent.subsystem_nqn
         self.namespaces = []
         self.subsystems = None
-        self.connection_info = None
         self.cpustats_enabled = False
         self.thread_stats = {}
         self.iostats = {}
@@ -296,15 +217,7 @@ class Collector:
         self.lock = threading.Lock()
         self.gw_info = None
         self.timestamp = time.time()
-        # self._min_sample_count = 2
-        # self._sample_count = 0
         self.health = Health()
-
-    # def update_subsystem(self, new_subsystem_nqn: str) -> None:
-    #     logger.info(f"updating subsystem to scan from {self.subsystem_nqn} to {new_subsystem_nqn}")
-    #     with self.lock:
-    #         self.subsystem_nqn = new_subsystem_nqn
-    #         self.reset_namespace_data()
 
     @property
     def total_iops(self):
@@ -323,20 +236,6 @@ class Collector:
         return sum([stats.total_bytes_rate for _, stats in self.iostats.items()])
 
     @property
-    def connections_defined(self):
-        if self.connection_info:
-            return len(self.connection_info.connections)
-        logger.debug("request for connections_defined but the connection_info is not set")
-        return 0
-
-    @property
-    def connections_active(self):
-        if self.connection_info:
-            return len([con.traddr for con in self.connection_info.connections if con.connected])
-        logger.debug("request for connections_active but the connection_info is not set")
-        return 0
-
-    @property
     def max_namespaces(self):
         for subsys in self.subsystems.subsystems:
             if subsys.nqn == self.subsystem_nqn:
@@ -347,10 +246,6 @@ class Collector:
     @property
     def ready(self) -> bool:
         return self.health.rc == 0
-
-    # @property
-    # def samples_ready(self) -> bool:
-    #     return self._sample_count == self._min_sample_count
 
     @property
     def total_namespaces_defined(self) -> int:
@@ -370,16 +265,13 @@ class Collector:
 
     def get_sorted_namespaces(self, sort_pos: int, ns_type: str = 'rbd'):
         ns_data = []
-        logger.info(f"VALLARI_DEBUG: before calculate {self.namespaces=}") 
         for ns in self.namespaces:
 
             ns_info = get_ns_info(ns, ns_type)
             bdev_name = ns.bdev_name
 
             perf_stats = self.iostats[bdev_name]
-            logger.info(f"VALLARI_DEBUG: before calculate {perf_stats=}")
             perf_stats.calculate(self.parent.delay)
-            logger.info(f"VALLARI_DEBUG: after calculate {perf_stats=}")
 
             ns_data.append((
                 ns.nsid,
@@ -421,23 +313,6 @@ class DataCollector(Collector):
     event = threading.Event()
 
     def initialise(self):
-        # self.set_gw_info()
-        # if self.health.rc > 0:
-        #     logger.error('Unable to retrieve gataway information')
-        #     return
-
-        # if self.parent.args.get('skip_version_check'):
-        #     logger.info('Skipped version check requested. Potential for grpc inconsistency')
-        # else:
-        #     gw_ok, msg = valid_gw_version(self.gw_info.version)
-        #     if not gw_ok:
-        #         logger.error(msg)
-        #         self.health.rc = 8
-        #         self.health.msg = msg
-        #         return
-        #     else:
-        #         logger.debug(f"Gateway version {self.gw_info.version} passed version check")
-
         self.subsystems = self._get_all_subsystems()
         if self.subsystems.status > 0:
             logger.error(f"Call to list_subsystems failed, RC={self.subsystems.status}, MSG={self.subsystems.error_message}")
@@ -450,7 +325,6 @@ class DataCollector(Collector):
             self.health.msg = 'No subsystems found'
             return
 
-        # check if the nqn exists if it has been provided
         if self.parent.subsystem_nqn:
             if self.parent.subsystem_nqn not in self.nqn_list:
                 logger.error("nqn provided is not present on the gateway")
@@ -475,19 +349,11 @@ class DataCollector(Collector):
         logger.debug(f"call to {method_name} successful")
         return data
 
-    def set_gw_info(self):
-        """Grab the gateway metadata"""
-        self.gw_info = self.call_grpc_api('get_gateway_info', NVMeoFClient.pb2.get_gateway_info_req())
-        logger.debug(f"VALLARI_DEBUG self.gw_info: {self.gw_info}")
-
     async def collect_data(self):
-        # if not self._sample_count == self._min_sample_count:
-        #     self._sample_count += 1
         namespace_info = self._get_namespaces()
         if not self.ready:
             return
 
-        # TODO namespace_info.status should be 0
         self.namespaces = namespace_info.namespaces
         logger.debug(f"Subsystem '{self.subsystem_nqn}' has {self.total_namespaces_defined} namespaces")
 
@@ -497,21 +363,11 @@ class DataCollector(Collector):
             tasks.append(t)
 
         subsystem_task = asyncio.create_task(asyncio.to_thread(self._get_all_subsystems))
-        connections_task = asyncio.create_task(asyncio.to_thread(self._get_connections))
-        tasks.extend([subsystem_task, connections_task])
+        tasks.extend([subsystem_task])
 
         await asyncio.gather(*tasks)
 
-        # python 3.11+ code
-        # async with asyncio.TaskGroup() as tg:
-        #     for ns in self.namespaces:
-        #         tg.create_task(asyncio.to_thread(self._get_ns_iostats, ns))
-
-        #     subsystem_task = tg.create_task(asyncio.to_thread(self._get_all_subsystems))
-        #     connections_task = tg.create_task(asyncio.to_thread(self._get_connections))
-
         self.subsystems = subsystem_task.result()
-        self.connection_info = connections_task.result()
 
         logger.debug("tasks completed")
 
@@ -545,15 +401,10 @@ class DataCollector(Collector):
     def _get_all_subsystems(self):
         return self.call_grpc_api('list_subsystems', NVMeoFClient.pb2.list_subsystems_req())
 
-    def _get_connections(self):
-        return self.call_grpc_api('list_connections', NVMeoFClient.pb2.list_connections_req(subsystem=self.subsystem_nqn))
-
     def get_cpu_stats(self):
         raise NotImplementedError
 
     async def start(self):
-        logger.info("VALLARI_DEBUG: collector.start")
-        # while not self.event.is_set():
         for i in range(2):
             start = time.time()
             await self.collect_data()
@@ -565,36 +416,12 @@ class DataCollector(Collector):
             self.timestamp = time.time()
             logger.debug(f"nqn_list is : {self.nqn_list}")
             if i == 0:
-                logger.info("VALLARI_DEBUG: going to sleep")
                 await asyncio.sleep(self.parent.delay)  
-                logger.info("VALLARI_DEBUG: slept!")
 
     def run(self):
-        logger.info("VALLARI_DEBUG: DataCollector.run")
         if self.ready:
             with self.lock:
-                logger.info("VALLARI_DEBUG: collector.start.locked")
                 asyncio.run(self.start())
-                logger.info("VALLARI_DEBUG: collector.start.locked sleep over")
-
-    # async def start(self):
-    #     # while not self.event.is_set():
-    #     with self.lock:
-    #         start = time.time()
-    #         await self.collect_data()
-    #         logger.info(f"data collection took: {(time.time() - start):3.3f} secs")
-
-    #         if not self.ready:
-    #             logger.error("Error encounted during data collection, terminating async loop")
-    #             return
-    #         self.timestamp = time.time()
-    #         # logger.debug(f"event loop waiting for {self.parent.delay}s")
-    #         logger.debug(f"nqn_list is : {self.nqn_list}")
-    #         time.sleep(self.parent.delay)
-
-    # def run(self):
-    #     if self.ready:
-    #         asyncio.run(self.start())
 
 
 # utils
@@ -614,17 +441,6 @@ def bytes_to_MB(bytes: int, si: int = 1024):
     return (bytes / si) / si
 
 
-def valid_gw_version(gw_version_str: str) -> Tuple[bool, str]:
-    min_version = version.Version('1.0.0')
-    try:
-        gw_version = version.Version(gw_version_str)
-    except version.InvalidVersion:
-        return False, 'Missing or invalid version - unable to check compatibility'
-    if gw_version >= min_version:
-        return True, 'OK'
-    return False, f"Incompatible gateway version. nvmeof-top requires {min_version} or above"
-
-
 def get_ns_info(ns, ns_type) -> str:
     if ns_type == 'rbd':
         return f"{ns.rbd_pool_name}/{ns.rbd_image_name}"
@@ -633,5 +449,4 @@ def get_ns_info(ns, ns_type) -> str:
 
     logger.error(f"requested an unknown ns type: {ns_type}")
     return 'Unknown'
-
 
