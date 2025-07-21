@@ -13,6 +13,7 @@ from packaging import version
 
 from mgr_module import CLIReadCommand, HandleCommandResult
 from ..controllers.prometheus import Prometheus
+from ..controllers import nvmeof as nvmeof_controllers
 from .nvmeof_client import NVMeoFClient
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ class NVMeoFTop:
         self.subsystem_nqn = args.get('subsystem')
         self.collector: DataCollector
         self.prometheus_source = args.get('prometheus_source')
+        self.gateway_addr = args.get('gateway_addr')
         # self.ui_loop: urwid.MainLoop
 
         # these variables are used to hold the UI objects
@@ -114,7 +116,7 @@ class NVMeoFTop:
 
 
 @CLIReadCommand('nvmeof top', poll=True)
-def nvmeof_top(_, subsystem: str, server_addr: str, group: str, refresh: bool,
+def nvmeof_top(_, subsystem: str, gateway_addr: str, group: str, refresh: bool,
             delay: int = 5, count: int = 0, duration: int = 30, 
             with_timestamp: bool = False, no_headings: bool = False,
             disable_prometheus_source: bool = False):
@@ -136,19 +138,17 @@ def nvmeof_top(_, subsystem: str, server_addr: str, group: str, refresh: bool,
         'count': count,
         'duration': duration,
         'with_timestamp': with_timestamp,
-        'no_headings': no_headings, 
-        # 'skip_version_check': skip_version_check,
-        # TODO: temporary args to use in NVMeoFClient
-        'server_addr': server_addr,
+        'no_headings': no_headings,
+        'gateway_addr': gateway_addr,
         'group': group,
         'prometheus_source': not disable_prometheus_source,
     }
     logger.info(f"VALLARI_DEBUG: new loop???")
     # logger.info(f"VALLARI_DEBUG: what is here {self=}")
-    if server_addr and group:
-        gateway_client = NVMeoFClient(gw_group=group, traddr=server_addr) # TODO: gw_group? traddr?
-    elif server_addr:
-        gateway_client = NVMeoFClient(traddr=server_addr) # TODO: gw_group? traddr?
+    # if gateway_addr and group:
+    #     gateway_client = NVMeoFClient(gw_group=group, traddr=gateway_addr) # TODO: gw_group? traddr?
+    if gateway_addr:
+        gateway_client = NVMeoFClient(traddr=gateway_addr) # TODO: gw_group? traddr?
     else:
         gateway_client = NVMeoFClient()
 
@@ -246,7 +246,6 @@ class Collector:
         self.subsystem_nqn = self.parent.subsystem_nqn
         self.namespaces = []
         self.subsystems = None
-        self.cpustats_enabled = False
         self.thread_stats = {}
         self.iostats = {}
         self.iostats_lock = threading.Lock()
@@ -255,6 +254,7 @@ class Collector:
         self.timestamp = time.time()
         self.health = Health()
         self.prometheus_source = self.parent.prometheus_source
+        self.gateway_instance = ''
 
     # @property
     # def total_iops(self):
@@ -301,7 +301,7 @@ class Collector:
         return 'Unknown'
 
     def log_connection(self):
-        logger.info(f"Connected to {self.parent.args.get('server_addr')}")
+        logger.info(f"Connected to {self.parent.args.get('gateway_addr')}")
         logger.info(f"Gateway has {self.total_subsystems} subsystems defined")
 
     def get_sorted_namespaces(self, sort_pos: int, ns_type: str = 'rbd'):
@@ -365,13 +365,18 @@ class Collector:
 
 
 class DataCollector(Collector):
-    event = threading.Event()
+    # event = threading.Event()
 
     def initialise(self):
         # self.set_gw_info()
         # if self.health.rc > 0:
         #     logger.error('Unable to retrieve gataway information')
         #     return
+        
+        if self.prometheus_source:
+            self.set_gateway_instance()
+            if not self.ready:
+                return None
 
         # if self.parent.args.get('skip_version_check'):
         #     logger.info('Skipped version check requested. Potential for grpc inconsistency')
@@ -400,8 +405,8 @@ class DataCollector(Collector):
             return
 
         # check if the nqn exists if it has been provided
-        if self.parent.subsystem_nqn:
-            if self.parent.subsystem_nqn not in self.nqn_list:
+        if self.subsystem_nqn:
+            if self.subsystem_nqn not in self.nqn_list:
                 logger.error("nqn provided is not present on the gateway")
                 self.health.rc = 12
                 self.health.msg = "Subsystem NQN provided not found"
@@ -423,54 +428,49 @@ class DataCollector(Collector):
         self.health.msg = f"{method_name} success"
         logger.debug(f"call to {method_name} successful")
         return data
-    
+
+    # def call_grpc_api(self, controller_klass, method_name, params: dict = {}):
+    #     logger.debug(f"calling gprc method {method_name}")
+    #     try:
+    #         controller = controller_klass()
+    #         func = getattr(controller, method_name)
+    #         data = func(**params)
+    #     except grpc._channel._InactiveRpcError:
+    #         self.health.rc = 8
+    #         self.health.msg = f"Unable to call RPC with dashboard API function {controller.__name__}.{method_name}"
+    #         logger.error(f"gprc call to {method_name} failed: {self.health.msg}")
+    #         return None
+
+    #     self.health.msg = f"{method_name} success"
+    #     logger.debug(f"call to {method_name} successful")
+    #     return data
+
     def call_prometheus_api(self, metric, filters: dict = {}):
         query = metric
-        metric_filters = [] # TODO: add instance=""
+        metric_filters = []
         for label, value in filters.items():
             metric_filters += [label + '="' + value + '"']
         if metric_filters:
             query += '{' + ','.join(metric_filters) + '}'
         params={'query': query}
         logger.info(f"VALLARI_DEBUG prometheus_params: {params}")
-        # url = f"http://localhost:9095/api/v1/query" # TODO: prometheus url and port?
-        # resp = requests.get('http://localhost:9095/api/v1/query', params={'query': query})
         try:
             prometheus = Prometheus()
             logger.info(f"VALLARI_DEBUG prometheus: {prometheus}")
-            # params['query'] = params.pop('params')
             data = prometheus.prometheus_proxy('GET', '/query', params=params)
-            # data = prometheus.get_prometeus_query_data(params=query)
             logger.info(f"VALLARI_DEBUG prometheus_data: {data}")
             return data["result"]
-            # resp = requests.get(url)
-            # data = resp.json()
         except Exception as exc:
             logger.exception(exc)
             self.health.rc = 8
-            self.health.msg = f"Prometheus unavailable!"
+            self.health.msg = f"Prometheus data unavailable!"
             return None
-        # if data["status"] == "success":
-        #     return data["data"]["result"]
-
-    # def set_gw_info(self):
-    #     """Grab the gateway metadata"""
-    #     if self.prometheus_source:
-    #         pass
-    #     else:
-    #         self.gw_info = self.call_grpc_api('get_gateway_info', NVMeoFClient.pb2.get_gateway_info_req())
-    #         logger.debug(f"VALLARI_DEBUG self.gw_info: {self.gw_info}")
 
     async def collect_data(self):
-        # if not self._sample_count == self._min_sample_count:
-        #     self._sample_count += 1
-        # namespace_info = self._get_namespaces()
         self.namespaces = self._get_namespaces()
         if not self.ready:
             return
 
-        # TODO namespace_info.status should be 0
-        # self.namespaces = namespace_info.namespaces
         logger.debug(f"Subsystem '{self.subsystem_nqn}' has {self.total_namespaces_defined} namespaces")
 
         tasks = []
@@ -479,23 +479,43 @@ class DataCollector(Collector):
             tasks.append(t)
 
         subsystem_task = asyncio.create_task(asyncio.to_thread(self._get_all_subsystems))
-        # connections_task = asyncio.create_task(asyncio.to_thread(self._get_connections))
         tasks.extend([subsystem_task])
-
+        
         await asyncio.gather(*tasks)
-
-        # python 3.11+ code
-        # async with asyncio.TaskGroup() as tg:
-        #     for ns in self.namespaces:
-        #         tg.create_task(asyncio.to_thread(self._get_ns_iostats, ns))
-
-        #     subsystem_task = tg.create_task(asyncio.to_thread(self._get_all_subsystems))
-        #     connections_task = tg.create_task(asyncio.to_thread(self._get_connections))
-
         self.subsystems = subsystem_task.result()
-        # self.connection_info = connections_task.result()
 
         logger.debug("tasks completed")
+
+    # def set_gw_info(self):
+    #     """Grab the gateway metadata"""
+    #     if self.prometheus_source:
+    #         res = self.call_prometheus_api('ceph_nvmeof_gateway_info')
+    #         self.gw_info = []
+    #         if res:
+    #             for gw in res:
+    #                 self.gw_info += [gw["metric"]]
+    #     else:
+    #         self.gw_info = self.call_grpc_api(nvmeof_controllers.NVMeoFGateway, 'list')
+    #         logger.debug(f"VALLARI_DEBUG self.gw_info: {self.gw_info}")
+
+    def set_gateway_instance(self):
+        """Grab the gateway metadata"""
+        if self.gateway_instance:
+            return
+        try:
+            gateways = self.call_prometheus_api('ceph_nvmeof_gateway_info')
+            if self.parent.gateway_addr:
+                for gw_ in gateways:
+                    gw = gw_['metric']
+                    if gw['addr'] == self.parent.gateway_addr:
+                        self.gateway_instance = gw['instance']
+                        break
+            else:
+                self.gateway_instance = gateways[0]['metric']['instance']
+        except:
+            self.health.rc = 8
+            self.health.msg = "No gateways found for prometheus!"
+
 
     def _get_ns_iostats(self, ns):
         logger.debug(f"fetching iostats for namespace {get_value(ns, 'nsid')}")
@@ -515,7 +535,8 @@ class DataCollector(Collector):
                 }
                 iostats = self.iostats[ns['bdev_name']]
                 for iostat_attr, metric in metrics.items():
-                    data = self.call_prometheus_api(metric, {"bdev_name": ns['bdev_name']})
+                    data = self.call_prometheus_api(metric, 
+                                    { "bdev_name": ns['bdev_name'], 'instance': self.gateway_instance })
                     if data:
                         value = float(data[0]["value"][1])
                         getattr(iostats, iostat_attr).update(value)
@@ -528,6 +549,9 @@ class DataCollector(Collector):
                 stats = self.call_grpc_api('namespace_get_io_stats', NVMeoFClient.pb2.namespace_get_io_stats_req(
                                             subsystem_nqn=self.parent.subsystem_nqn,
                                             nsid=ns.nsid))
+                # stats = self.call_grpc_api(nvmeof_controllers.NVMeoFNamespace, 'io_stats',
+                #                             {'nqn': self.subsystem_nqn, 'nsid': ns.nsid} 
+                #                         )
                 iostats = self.iostats[ns.bdev_name]
                 iostats.read_ops.update(stats.num_read_ops)
                 iostats.read_bytes.update(stats.bytes_read)
@@ -541,16 +565,18 @@ class DataCollector(Collector):
             result = []
             namespaces = self.call_prometheus_api(
                 'ceph_nvmeof_subsystem_namespace_metadata{nqn="' + self.subsystem_nqn +
+                '", instance="' + self.gateway_instance + 
                 '"}==on(instance, bdev_name)group_left(pool_name, rbd_name)ceph_nvmeof_bdev_metadata'
             )
             if not namespaces:
                 logger.info('VALLARI_DEBUG no namespaces!')
                 return []
             for ns in namespaces:
-                # if ns["value"][1] == "1":
                 result += [ns["metric"]]
             return result
         else:
+            # data = self.call_grpc_api(nvmeof_controllers.NVMeoFNamespace, 'list', {'nqn': self.subsystem_nqn})
+            # return data.namespaces
             return self.call_grpc_api('list_namespaces', NVMeoFClient.pb2.list_namespaces_req(subsystem=self.subsystem_nqn)).namespaces
 
     # def _get_subsystems(self):
@@ -567,7 +593,8 @@ class DataCollector(Collector):
     def _get_all_subsystems(self):
         if self.prometheus_source:
             result = []
-            subsystems = self.call_prometheus_api('ceph_nvmeof_subsystem_namespace_count')
+            subsystems = self.call_prometheus_api('ceph_nvmeof_subsystem_namespace_count', 
+                                                  { 'instance': self.gateway_instance })
             if not subsystems:
                 logger.info('VALLARI_DEBUG no subsystems!')
                 return []
@@ -579,6 +606,7 @@ class DataCollector(Collector):
             return result
         else:
             resp = self.call_grpc_api('list_subsystems', NVMeoFClient.pb2.list_subsystems_req())
+            # resp = self.call_grpc_api(nvmeof_controllers.NVMeoFSubsystem, 'list')
             if resp.status > 0:
                 logger.error(f"Call to list_subsystems failed, RC={resp.status}, MSG={resp.error_message}")
                 self.health.rc = 8
