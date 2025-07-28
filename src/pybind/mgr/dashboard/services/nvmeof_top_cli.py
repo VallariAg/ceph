@@ -1,12 +1,9 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, Tuple
 import threading
 import time
 import logging
-import sys
 import grpc
 import asyncio
-from packaging import version
 
 from mgr_module import CLIReadCommand, HandleCommandResult
 
@@ -19,7 +16,6 @@ logger.setLevel(logging.DEBUG)
 class NVMeoFTop:
     text_headers = ['NSID', 'RBD pool/image', 'IOPS', 'r/s', 'rMB/s', 'r_await', 'rareq-sz', 'w/s', 'wMB/s', 'w_await', 'wareq-sz', 'LBGrp', 'QoS']
     text_template = "{:>4}   {:<40}   {:>7}   {:>6}   {:>6}   {:>7}   {:>8}   {:>6}   {:>6}   {:>7}   {:>8}   {:^5}   {:>3}\n"
-    ns_description_types = ['rbd', 'vmware']
 
     def __init__(self, args: dict, client: NVMeoFClient):
         self.client = client
@@ -27,8 +23,9 @@ class NVMeoFTop:
         self.delay = args.get('delay')
         self.subsystem_nqn = args.get('subsystem')
         self.collector: DataCollector
-        self.sort_key = 'NSID'
-        self.reverse_sort = False
+        self.sort_key = args.get('sort_by', 'NSID')
+        self.reverse_sort = args.get('sort_descending')
+        self.status_code = 0
 
     def to_stdout(self):
         """Dump namespace performance stats to stdout"""
@@ -44,21 +41,20 @@ class NVMeoFTop:
         if not self.args.get('no_headings'):
             rows.append(NVMeoFTop.text_template.format(*NVMeoFTop.text_headers))
         if ns_data:
-            # ns_data.sort(key=lambda x: x.nsid, reverse=False)
             for ns in ns_data:
-                # row = self.build_ns_row(ns)
                 rows.append(NVMeoFTop.text_template.format(*ns))
         else:
             rows.append("<no namespaces defined>\n")
 
         return ''.join(rows) 
 
-    def batch_mode(self) -> None:
-        logger.info(f"Running in batch mode querying {self.args.get('subsystem')}")
+    def get_batch(self) -> None:
+        logger.info(f"Running nvmeof top tool for {self.args.get('subsystem')}")
         rt_stdout = ""
         try:
             if not self.collector.ready:
-                abort(self.collector.health.rc, self.collector.health.msg)
+                self.status_code = self.collector.health.rc
+                return self.collector.health.msg 
 
             rt_stdout += self.to_stdout()
         except KeyboardInterrupt:
@@ -73,53 +69,52 @@ class NVMeoFTop:
 
         self.collector.initialise()
         if not self.collector.ready:
-            abort(self.collector.health.rc, self.collector.health.msg)
+            self.status_code = self.collector.health.rc
+            return (self.status_code, f"nvmeof-top has encountered an error: {self.collector.health.msg}")
 
         t = threading.Thread(target=self.collector.run, daemon=True)
         t.start()
 
         assert self.args.get('subsystem')
-        return self.batch_mode()
+        return (self.status_code, self.get_batch())
 
 
 @CLIReadCommand('nvmeof top', poll=True)
-def nvmeof_top(_, subsystem: str, server_addr: str, group: str, refresh: bool,
-            delay: int = 5, count: int = 0, duration: int = 30, 
-            with_timestamp: bool = False, no_headings: bool = False):
+def nvmeof_top(_, subsystem: str, delay: int = 3,
+                server_addr: str = '', group: str = '',
+                descending: bool = False, sort_by: str = 'NSID',
+                with_timestamp: bool = False, no_headings: bool = False):
     '''
-    NVMe-oF Top Tool
-    --subsystem 
-
-    (boolean)
+    NVMeoF Top Tool
+    --subsystem '<nqn>'
+    --delay <seconds: int>
+    --descending
+    --sort-by '<header>'
     --with-timestamp 
     --no-headings
-
-    --duration 20 (seconds)
-    --delay 20 (seconds)
-    --count 10
     '''
     args = {
         'subsystem': subsystem,
         'delay': delay,
-        'count': count,
-        'duration': duration,
         'with_timestamp': with_timestamp,
-        'no_headings': no_headings, 
-        # TODO: temporary args to use in NVMeoFClient
+        'no_headings': no_headings,
+        'sort_descending': descending,
+        'sort_by': sort_by,
         'server_addr': server_addr,
         'group': group,
     }
-    if server_addr and group:
-        gateway_client = NVMeoFClient(gw_group=group, traddr=server_addr) # TODO: gw_group? traddr?
-    elif server_addr:
-        gateway_client = NVMeoFClient(traddr=server_addr) # TODO: gw_group? traddr?
-    else:
-        gateway_client = NVMeoFClient()
+    # if server_addr and group:
+    gateway_client = NVMeoFClient(gw_group=group, traddr=server_addr)
+    args['server_addr'] = gateway_client.gateway_addr
+    # elif server_addr:
+    #     gateway_client = NVMeoFClient(traddr=server_addr)
+    # else:
+    #     gateway_client = NVMeoFClient()
+
 
     top_tool = NVMeoFTop(args, gateway_client) 
-    ret = top_tool.run()
-    return HandleCommandResult(stdout=ret)
-
+    rc, output = top_tool.run()
+    return HandleCommandResult(stdout=output, retval=rc)
 
 
 class Health:
@@ -189,29 +184,13 @@ class PerformanceStats:
             self.w_await = 0.0
 
 
-class ThreadCPUStats:
-    def __init__(self, thread_name: str):
-        self.name = thread_name
-
-        # values stored by the counter object should be the value / tick_rate
-        self.busy = Counter()
-
-        self.busy_rate = 0.0
-
-    def calculate(self, delay: int) -> None:
-        self.busy_rate = self.busy.rate(delay)
-
-
-class Collector:
-
+class DataCollector:
     def __init__(self, parent):
         self.parent = parent
         self.client = self.parent.client
         self.subsystem_nqn = self.parent.subsystem_nqn
         self.namespaces = []
         self.subsystems = None
-        self.cpustats_enabled = False
-        self.thread_stats = {}
         self.iostats = {}
         self.iostats_lock = threading.Lock()
         self.lock = threading.Lock()
@@ -220,28 +199,8 @@ class Collector:
         self.health = Health()
 
     @property
-    def total_iops(self):
-        return int(sum([stats.total_ops_rate for _, stats in self.iostats.items()]))
-
-    @property
     def nqn_list(self):
         return [subsys.nqn for subsys in self.subsystems.subsystems]
-
-    @property
-    def total_namespaces(self):
-        return sum([subsys.namespace_count for subsys in self.subsystems.subsystems])
-
-    @property
-    def total_bandwidth(self):
-        return sum([stats.total_bytes_rate for _, stats in self.iostats.items()])
-
-    @property
-    def max_namespaces(self):
-        for subsys in self.subsystems.subsystems:
-            if subsys.nqn == self.subsystem_nqn:
-                return subsys.max_namespaces
-        logger.error("Request for max namespaces could not find a match against the NQN! Returning 0")
-        return 0
 
     @property
     def ready(self) -> bool:
@@ -255,19 +214,15 @@ class Collector:
     def total_subsystems(self) -> int:
         return len(self.nqn_list)
 
-    @property
-    def reactor_cores(self) -> int:
-        return len(self.thread_stats.keys())
-
     def log_connection(self):
         logger.info(f"Connected to {self.parent.args.get('server_addr')}")
         logger.info(f"Gateway has {self.total_subsystems} subsystems defined")
 
-    def get_sorted_namespaces(self, sort_pos: int, ns_type: str = 'rbd'):
+    def get_sorted_namespaces(self, sort_pos: int):
         ns_data = []
         for ns in self.namespaces:
 
-            ns_info = get_ns_info(ns, ns_type)
+            ns_info = f"{ns.rbd_pool_name}/{ns.rbd_image_name}"
             bdev_name = ns.bdev_name
 
             perf_stats = self.iostats[bdev_name]
@@ -278,62 +233,34 @@ class Collector:
                 ns_info,
                 int(perf_stats.total_ops_rate),
                 int(perf_stats.read_ops_rate),
-                f"{bytes_to_MB(perf_stats.read_bytes_rate):3.2f}",
+                f"{self.bytes_to_MB(perf_stats.read_bytes_rate):3.2f}",
                 f"{perf_stats.r_await:3.2f}",
                 f"{perf_stats.rareq_sz:4.2f}",
                 int(perf_stats.write_ops_rate),
-                f"{bytes_to_MB(perf_stats.write_bytes_rate):3.2f}",
+                f"{self.bytes_to_MB(perf_stats.write_bytes_rate):3.2f}",
                 f"{perf_stats.w_await:3.2f}",
                 f"{perf_stats.wareq_sz:4.2f}",
-                lb_group(ns.load_balancing_group),
+                self.lb_group(ns.load_balancing_group),
                 self.qos_enabled(ns)
             ))
 
         ns_data.sort(key=lambda t: t[sort_pos], reverse=self.parent.reverse_sort)
         return ns_data
 
-    def get_cpu_stats(self) -> Dict[str, ThreadCPUStats]:
-        for name, stats in self.thread_stats.items():
-            stats.calculate(self.parent.delay)
-        return self.thread_stats
-
     def qos_enabled(self, ns) -> str:
         if (ns.rw_ios_per_second or ns.rw_mbytes_per_second or ns.r_mbytes_per_second or ns.w_mbytes_per_second):
             return 'Yes'
         return 'No'
+    
+    def lb_group(self, grp_id: int):
+        """Provide a meaningful default when load-balancing is not in use"""
+        return "N/A" if grp_id == 0 else f"{grp_id}"
 
-    def initialise(self):
-        raise NotImplementedError(f"class {self.__class__.__name__} is missing initialise() method")
+    def bytes_to_MB(self, bytes: int, si: int = 1024):
+        """Simple conversion of bytes to with MiB or MB"""
+        return (bytes / si) / si
 
-    def run(self):
-        raise NotImplementedError(f"class {self.__class__.__name__} is missing run() method")
-
-
-class DataCollector(Collector):
-    event = threading.Event()
-
-    def initialise(self):
-        self.subsystems = self._get_all_subsystems()
-        if self.subsystems.status > 0:
-            logger.error(f"Call to list_subsystems failed, RC={self.subsystems.status}, MSG={self.subsystems.error_message}")
-            self.health.rc = 8
-            self.health.msg = "Unable to retrieve a list of subsystems"
-            return
-
-        if self.total_subsystems == 0:
-            self.health.rc = 8
-            self.health.msg = 'No subsystems found'
-            return
-
-        if self.parent.subsystem_nqn:
-            if self.parent.subsystem_nqn not in self.nqn_list:
-                logger.error("nqn provided is not present on the gateway")
-                self.health.rc = 12
-                self.health.msg = "Subsystem NQN provided not found"
-                return
-
-        self.log_connection()
-
+    # grpc methods
     def call_grpc_api(self, method_name, request):
         logger.debug(f"calling gprc method {method_name}")
         try:
@@ -349,28 +276,6 @@ class DataCollector(Collector):
         logger.debug(f"call to {method_name} successful")
         return data
 
-    async def collect_data(self):
-        namespace_info = self._get_namespaces()
-        if not self.ready:
-            return
-
-        self.namespaces = namespace_info.namespaces
-        logger.debug(f"Subsystem '{self.subsystem_nqn}' has {self.total_namespaces_defined} namespaces")
-
-        tasks = []
-        for ns in self.namespaces:
-            t = asyncio.create_task(asyncio.to_thread(self._get_ns_iostats, ns))
-            tasks.append(t)
-
-        subsystem_task = asyncio.create_task(asyncio.to_thread(self._get_all_subsystems))
-        tasks.extend([subsystem_task])
-
-        await asyncio.gather(*tasks)
-
-        self.subsystems = subsystem_task.result()
-
-        logger.debug("tasks completed")
-
     def _get_ns_iostats(self, ns):
         logger.debug(f"fetching iostats for namespace {ns.nsid}")
         with self.iostats_lock:
@@ -380,7 +285,7 @@ class DataCollector(Collector):
             logger.debug('calling namespace_get_io_stats')
             stats = self.call_grpc_api('namespace_get_io_stats',
                                        NVMeoFClient.pb2.namespace_get_io_stats_req(
-                                           subsystem_nqn=self.parent.subsystem_nqn,
+                                           subsystem_nqn=self.subsystem_nqn,
                                            nsid=ns.nsid))
             logger.debug(stats)
 
@@ -401,8 +306,47 @@ class DataCollector(Collector):
     def _get_all_subsystems(self):
         return self.call_grpc_api('list_subsystems', NVMeoFClient.pb2.list_subsystems_req())
 
-    def get_cpu_stats(self):
-        raise NotImplementedError
+    # collector methods
+    def initialise(self):
+        self.subsystems = self._get_all_subsystems()
+        if self.subsystems.status > 0:
+            logger.error(f"Call to list_subsystems failed, RC={self.subsystems.status}, MSG={self.subsystems.error_message}")
+            self.health.rc = 8
+            self.health.msg = "Unable to retrieve a list of subsystems"
+            return
+
+        if self.total_subsystems == 0:
+            self.health.rc = 8
+            self.health.msg = 'No subsystems found'
+            return
+
+        if self.subsystem_nqn:
+            if self.subsystem_nqn not in self.nqn_list:
+                logger.error("nqn provided is not present on the gateway")
+                self.health.rc = 12
+                self.health.msg = "Subsystem NQN provided not found"
+                return
+
+        self.log_connection()
+
+    async def collect_data(self):
+        namespace_info = self._get_namespaces()
+        if not self.ready:
+            return
+
+        self.namespaces = namespace_info.namespaces
+        logger.debug(f"Subsystem '{self.subsystem_nqn}' has {self.total_namespaces_defined} namespaces")
+
+        tasks = []
+        for ns in self.namespaces:
+            t = asyncio.create_task(asyncio.to_thread(self._get_ns_iostats, ns))
+            tasks.append(t)
+        subsystem_task = asyncio.create_task(asyncio.to_thread(self._get_all_subsystems))
+        tasks.extend([subsystem_task])
+
+        await asyncio.gather(*tasks)
+        self.subsystems = subsystem_task.result()
+        logger.debug("tasks completed")
 
     async def start(self):
         for i in range(2):
@@ -422,31 +366,4 @@ class DataCollector(Collector):
         if self.ready:
             with self.lock:
                 asyncio.run(self.start())
-
-
-# utils
-
-def abort(rc: int, msg: str):
-    logger.critical(f"nvmeof-top has encountered an error: {msg}")
-    print(msg)
-    sys.exit(rc)
-
-def lb_group(grp_id: int):
-    """Provide a meaningful default when load-balancing is not in use"""
-    return "N/A" if grp_id == 0 else f"{grp_id}"
-
-
-def bytes_to_MB(bytes: int, si: int = 1024):
-    """Simple conversion of bytes to with MiB or MB"""
-    return (bytes / si) / si
-
-
-def get_ns_info(ns, ns_type) -> str:
-    if ns_type == 'rbd':
-        return f"{ns.rbd_pool_name}/{ns.rbd_image_name}"
-    elif ns_type == 'vmware':
-        return f"eui.{ns.uuid.replace('-', '')}"
-
-    logger.error(f"requested an unknown ns type: {ns_type}")
-    return 'Unknown'
 
