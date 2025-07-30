@@ -14,6 +14,11 @@ logger.setLevel(logging.DEBUG)
 
 
 class NVMeoFTop:
+    reactors_headers = ['Reactor Cores', 'Total CPU', 'AVG CPU', 'Min CPU', 'Max CPU']
+    subsystem_summary_headers = ['Subsystem', 'Namespaces', 'Total IOPS', 'Throughput']
+    summary_headers = ['Gateways', 'Total Subsystems', 'Total Namespaces']
+    # text_template = "{:>4}   {:<40}   {:>7}   {:>6}   {:>6}   {:>7}   {:>8}   {:>6}   {:>6}   {:>7}   {:>8}   {:^5}   {:>3}\n"
+    # text_headers = ['']
     text_headers = ['NSID', 'RBD pool/image', 'IOPS', 'r/s', 'rMB/s', 'r_await', 'rareq-sz', 'w/s', 'wMB/s', 'w_await', 'wareq-sz', 'LBGrp', 'QoS']
     text_template = "{:>4}   {:<40}   {:>7}   {:>6}   {:>6}   {:>7}   {:>8}   {:>6}   {:>6}   {:>7}   {:>8}   {:^5}   {:>3}\n"
 
@@ -33,11 +38,28 @@ class NVMeoFTop:
         sort_pos = NVMeoFTop.text_headers.index(self.sort_key)
         with self.collector.lock:
             ns_data = self.collector.get_sorted_namespaces(sort_pos=sort_pos)
+            reactor_data = self.collector.get_reactor_data()
+            subsystem_summary_data = self.collector.get_subsystem_summary_data()
+            overall_summary_data = self.collector.get_overall_summary_data()
 
         rows = []
         if self.args.get('with_timestamp'):
             tstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.collector.timestamp))
             rows.append(f"{tstamp}\n")
+        if not self.args.get('no_reactor'):
+            reactor_row = ""
+            for index, header in enumerate(NVMeoFTop.reactors_headers):
+                reactor_row += f"{header}: {reactor_data[index]}  "
+            rows.append(reactor_row + "\n")
+        if not self.args.get('no_summary'):
+            summary_row = ""
+            for index, header in enumerate(NVMeoFTop.summary_headers):
+                summary_row += f"{header}: {overall_summary_data[index]}  "
+            rows.append(summary_row + "\n")
+            subsys_summary_row = ""
+            for index, header in enumerate(NVMeoFTop.subsystem_summary_headers):
+                subsys_summary_row += f"{header}: {subsystem_summary_data[index]}  "
+            rows.append(subsys_summary_row + "\n")
         if not self.args.get('no_headings'):
             rows.append(NVMeoFTop.text_template.format(*NVMeoFTop.text_headers))
         if ns_data:
@@ -83,7 +105,8 @@ class NVMeoFTop:
 def nvmeof_top(_, subsystem: str, delay: int = 3,
                 server_addr: str = '', group: str = '',
                 descending: bool = False, sort_by: str = 'NSID',
-                with_timestamp: bool = False, no_headings: bool = False):
+                with_timestamp: bool = False, no_headings: bool = False,
+                no_summary: bool = False, no_reactor: bool = False):
     '''
     NVMeoF Top Tool
     --subsystem '<nqn>'
@@ -97,11 +120,14 @@ def nvmeof_top(_, subsystem: str, delay: int = 3,
         'subsystem': subsystem,
         'delay': delay,
         'with_timestamp': with_timestamp,
+        'no_summary': no_summary,
+        'no_reactor': no_reactor,
         'no_headings': no_headings,
         'sort_descending': descending,
         'sort_by': sort_by,
         'server_addr': server_addr,
         'group': group,
+
     }
     gateway_client = NVMeoFClient(gw_group=group, traddr=server_addr)
     args['server_addr'] = gateway_client.gateway_addr
@@ -207,6 +233,30 @@ class DataCollector:
     @property
     def total_subsystems(self) -> int:
         return len(self.nqn_list)
+    
+    @property
+    def total_namespaces_overall(self):
+        total = 0
+        for subsys in self.subsystems.subsystems:
+            # if subsys.nqn == self.subsystem_nqn:
+            total += subsys.namespace_count
+        return total
+
+    @property
+    def total_iops(self):
+        return int(sum([stats.total_ops_rate for _, stats in self.iostats.items()]))
+
+    @property
+    def total_bandwidth(self):
+        return sum([stats.total_bytes_rate for _, stats in self.iostats.items()])
+
+    @property
+    def max_namespaces(self):
+        for subsys in self.subsystems.subsystems:
+            if subsys.nqn == self.subsystem_nqn:
+                return subsys.max_namespaces
+        logger.error("Request for max namespaces could not find a match against the NQN! Returning 0")
+        return 0
 
     def log_connection(self):
         logger.info(f"Connected to {self.parent.args.get('server_addr')}")
@@ -240,6 +290,27 @@ class DataCollector:
 
         ns_data.sort(key=lambda t: t[sort_pos], reverse=self.parent.reverse_sort)
         return ns_data
+    
+    def get_reactor_data(self): # TODO
+        # reactors_headers = ['Reactor Cores', 'Total CPU', 'AVG CPU', 'Min CPU', 'Max CPU']
+        return ['3', '151%', '50.3%', '25%', '67%'] 
+
+    def get_subsystem_summary_data(self):
+        # summary_headers = ['Subsystem', 'Namespaces', 'Total IOPS', 'Throughput']
+        return [
+            self.subsystem_nqn, 
+            f'{self.total_namespaces_defined} / {self.max_namespaces}', 
+            self.total_iops, 
+            f'{(self.total_bandwidth / 1024**2):>7.2f} MiB/s'
+        ]
+
+    def get_overall_summary_data(self):
+        # summary_headers = ['Gateways', 'Total Subsystems', 'Total Namespaces']
+        return [
+            self.parent.args.get('server_addr'), # TODO
+            self.total_subsystems,
+            self.total_namespaces_overall,
+        ]
 
     def qos_enabled(self, ns) -> str:
         if (ns.rw_ios_per_second or ns.rw_mbytes_per_second or ns.r_mbytes_per_second or ns.w_mbytes_per_second):
@@ -293,6 +364,9 @@ class DataCollector:
 
     def _get_namespaces(self):
         return self.call_grpc_api('list_namespaces', NVMeoFClient.pb2.list_namespaces_req(subsystem=self.subsystem_nqn))
+
+    def _get_threads_stats(self):
+        return self.call_grpc_api('get_thread_stats', NVMeoFClient.pb2.get_spdk_thread_stats_req())
 
     def _get_subsystems(self):
         return self.call_grpc_api('list_subsystems', NVMeoFClient.pb2.list_subsystems_req(subsystem_nqn=self.subsystem_nqn))
