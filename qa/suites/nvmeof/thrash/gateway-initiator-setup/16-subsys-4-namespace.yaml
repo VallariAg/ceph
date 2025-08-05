@@ -13,6 +13,19 @@ tasks:
 - cephadm.wait_for_service:
     service: nvmeof.mypool.mygroup0
 
+- cephadm.exec:
+    host.a:
+      - ceph orch ls nvmeof --export > /tmp/nvmeof-orig.yaml
+      - cp /tmp/nvmeof-orig.yaml /tmp/nvmeof-dsa.yaml 
+      - "sed -i '/  pool: mypool/a\\  enable_dsa_acceleration: true' /tmp/nvmeof-dsa.yaml"
+      - cat /tmp/nvmeof-dsa.yaml
+      - ceph orch ls
+      - ceph orch apply -i /tmp/nvmeof-dsa.yaml
+      - ceph orch redeploy nvmeof.mypool.mygroup0
+      
+- cephadm.wait_for_service:
+    service: nvmeof.mypool.mygroup0
+
 - workunit:
     no_coverage_and_limits: true
     clients:
