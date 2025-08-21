@@ -69,7 +69,11 @@ class NvmeofService(CephService):
         self.mgr.log.info(f"gateway address: {addr} from {map_addr=} {spec.addr=} {host_ip=}")
         discovery_addr = map_discovery_addr or spec.discovery_addr or host_ip
         self.mgr.log.info(f"discovery address: {discovery_addr} from {map_discovery_addr=} {spec.discovery_addr=} {host_ip=}")
- 
+        # self.mgr.log.info(f"VALLARI_DEBUG: {spec=}")
+        daemons = self.mgr.cache.get_daemons_by_service(daemon_spec.service_name)
+        self.mgr.log.info(f"VALLARI_DEBUG: {daemons=}")
+        # hosts = {d.hostname for d in daemons.values()}
+        # self.mgr.log.info(f"VALLARI_DEBUG: {hosts=}")
         default_listeners = spec.default_listeners # "1.1.1.*:4420,2.2.2.*:4420"
         if default_listeners:
             listeners_ip = ""
@@ -79,15 +83,17 @@ class NvmeofService(CephService):
                 daemons = self.mgr.cache.get_daemons_by_service(daemon_spec.service_name)
                 self.mgr.log.info(f"VALLARI_DEBUG: {daemons=}")
                 if not daemons:
-                    self.mgr.log.info(f"No nvmeof daemons!")
+                    self.mgr.log.info(f"No daemons found to add default_listeners!")
                     continue
                 hosts = {d.hostname for d in daemons}
                 self.mgr.log.info(f"VALLARI_DEBUG: {hosts=}")
                 for h in hosts:
                     ip = self.get_matching_host_ip(h, ip_format)
+                    self.mgr.log.info(f"VALLARI_DEBUG: {ip=}")
                     if ip:
                         if utils.resolve_ip(ip):
-                            listeners_ip += ip + ":" + port
+                            listeners_ip += f'{h}={ip}:{port};'
+            self.mgr.log.info(f"VALLARI_DEBUG: {listeners_ip=}")
             default_listeners = listeners_ip
         context = {
             'spec': spec,
@@ -149,6 +155,24 @@ class NvmeofService(CephService):
         daemon_spec.final_config, daemon_spec.deps = self.generate_config(daemon_spec)
         daemon_spec.deps = []
         return daemon_spec
+
+    def get_service_hostnames(self, service_name):
+        self.mgr.log.info(f"VALLARI_DEBUG: self.mgr.cache.networks {self.mgr.cache.networks}")
+        self.mgr.log.info(f"VALLARI_DEBUG: self.mgr.cache.daemons {self.mgr.cache.daemons}")
+        self.mgr.log.info(f"VALLARI_DEBUG: {service_name=}")
+        hosts = set()
+        # daemons = self.mgr.cache.daemons.get(service_name, {})
+        # for d in daemons.values():
+        #     hosts.add(d.hostname)
+        # return list(hosts)
+        for host, daemons in self.mgr.cache.daemons.items():
+            self.mgr.log.info(f"VALLARI_DEBUG: {host=} {daemons=}")
+            for d in daemons.values():
+                self.mgr.log.info(f"VALLARI_DEBUG: {d=} {d.service_name=}")
+                if d.service_name == service_name:
+                    hosts.add(host)
+                    self.mgr.log.info(f"VALLARI_DEBUG: Found nvmeof daemon {d.name} with service {d.service_name} on host {host}")
+        return list(hosts)
 
     def get_matching_host_ip(self, host: str, ip_format: str) -> Optional[str]:
         networks = self.mgr.cache.networks.get(host, {})
