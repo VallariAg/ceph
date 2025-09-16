@@ -1,6 +1,7 @@
 import errno
 import logging
 import json
+import re
 from typing import List, cast, Optional
 from ipaddress import ip_address, IPv6Address, ip_network
 
@@ -132,17 +133,17 @@ class NvmeofService(CephService):
         discovery_addr = map_discovery_addr or spec.discovery_addr or host_ip
         self.mgr.log.info(f"discovery address: {discovery_addr} from {map_discovery_addr=} {spec.discovery_addr=} {host_ip=}")
  
-        default_listeners = spec.default_listeners # "1.1.1.*:4420,2.2.2.*:4420"
+        default_listeners = spec.default_listeners # "1.1.1.*,2.2.2.*"
         if default_listeners:
-            listeners_ip = ""
-            for listeners_subnets in default_listeners.split(','):
-                ip_format, port = listeners_subnets.rsplit(':', 1)
-                ip_format, _ = ip_format.rsplit(".", 1)
-                ip = self.get_matching_host_ip(daemon_spec.host, ip_format)
-                if ip:
+            listeners_ip = []
+            for ip_format in default_listeners.split(','):
+                # ip_format, port = listeners_subnets.rsplit(':', 1)
+                # ip_format, _ = listeners_subnets.rsplit(".", 1)
+                ips = self.get_matching_host_ip(daemon_spec.host, ip_format)
+                for ip in ips:
                     if utils.resolve_ip(ip):
-                        listeners_ip += ip + ":" + port
-            default_listeners = listeners_ip
+                        listeners_ip += [ip]
+            default_listeners = ";".join(listeners_ip) # "1.1.1.1;2.2.2.2"
         context = {
             'spec': spec,
             'name': name,
@@ -183,16 +184,17 @@ class NvmeofService(CephService):
         daemon_spec.deps = []
         return daemon_spec
 
-    def get_matching_host_ip(self, host: str, ip_format: str) -> Optional[str]:
+    def get_matching_host_ip(self, host: str, ip_format: str) -> List[str]:
         networks = self.mgr.cache.networks.get(host, {})
-        ipaddr = None
+        ipaddr = []
         for n_subnet, n_ifaces in networks.items(): 
-            if ip_network(n_subnet).version != 4:
-                continue
+            # if ip_network(n_subnet).version != 4:
+            #     continue
             for ip_list in n_ifaces.values():
                 for ip in ip_list:
-                    if ip.startswith(ip_format):
-                        ipaddr = ip
+                    if re.match(ip_format, ip):
+                    # if ip.startswith(ip_format):
+                        ipaddr += [ip]
         return ipaddr
 
     def daemon_check_post(self, daemon_descrs: List[DaemonDescription]) -> None:
