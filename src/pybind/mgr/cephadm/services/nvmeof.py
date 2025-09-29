@@ -133,16 +133,13 @@ class NvmeofService(CephService):
         discovery_addr = map_discovery_addr or spec.discovery_addr or host_ip
         self.mgr.log.info(f"discovery address: {discovery_addr} from {map_discovery_addr=} {spec.discovery_addr=} {host_ip=}")
  
-        default_listeners = spec.default_listeners # "1.1.1.*,2.2.2.*"
+        default_listeners = spec.default_listeners # "1.1.1.1/24,2.2.2.1/24"
         if default_listeners:
             listeners_ip = []
-            for ip_format in default_listeners.split(','):
-                # ip_format, port = listeners_subnets.rsplit(':', 1)
-                # ip_format, _ = listeners_subnets.rsplit(".", 1)
-                ips = self.get_matching_host_ip(daemon_spec.host, ip_format)
-                for ip in ips:
-                    if utils.resolve_ip(ip):
-                        listeners_ip += [ip]
+            for subnet in default_listeners.split(','):
+                ips = self.get_matching_host_ip(daemon_spec.host, subnet)
+                if ips:
+                    listeners_ip += ips
             default_listeners = ";".join(listeners_ip) # "1.1.1.1;2.2.2.2"
         context = {
             'spec': spec,
@@ -184,18 +181,20 @@ class NvmeofService(CephService):
         daemon_spec.deps = []
         return daemon_spec
 
-    def get_matching_host_ip(self, host: str, ip_format: str) -> List[str]:
-        networks = self.mgr.cache.networks.get(host, {})
-        ipaddr = []
-        for n_subnet, n_ifaces in networks.items(): 
-            # if ip_network(n_subnet).version != 4:
-            #     continue
-            for ip_list in n_ifaces.values():
-                for ip in ip_list:
-                    if re.match(ip_format, ip):
-                    # if ip.startswith(ip_format):
-                        ipaddr += [ip]
-        return ipaddr
+    def get_matching_host_ip(self, host: str, subnet: str) -> List[str]:
+        ipaddrs = set()
+        try:
+            subnet = ip_network(subnet)
+            networks = self.mgr.cache.networks.get(host, {})
+            for n_subnet, n_ifaces in networks.items(): 
+                for n_ip_list in n_ifaces.values():
+                    for ip in n_ip_list:
+                        logger.info(f"VALLARI_DEBUG 1: {ip} {subnet}")
+                        if ip_address(ip) in subnet and utils.resolve_ip(ip):
+                            ipaddrs.add(ip)
+        except Exception as e:
+            logger.error(f"Found some error while finding matching host IPs in subnet {subnet}: {e}")
+        return list(ipaddrs)
 
     def daemon_check_post(self, daemon_descrs: List[DaemonDescription]) -> None:
         """ Overrides the daemon_check_post to add nvmeof gateways safely
