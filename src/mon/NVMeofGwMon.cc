@@ -532,6 +532,26 @@ bool NVMeofGwMon::preprocess_command(MonOpRequestRef op)
       sstrm.str("");
     } 
     else {
+      auto& service_map = mgrstatmon()->get_service_map();
+      std::map<NvmeGroupKey, std::string> gateway_hostnames;
+      for (auto& p : service_map.services) {
+        if (p.first == "nvmeof") {
+          auto daemons = p.second.daemons;
+          for (auto& d : daemons) {
+            auto hostname = d.second.metadata.find("hostname");
+            // auto pool = d.second.metadata.find("pool_name"); 
+            // auto gw_id = d.second.metadata.find("id");
+            NvmeGroupKey curr_group_key = std::make_pair(pool->second,  group->second); 
+            if (curr_group_key == group_key) {
+              gateway_hostnames[group_key] = hostname;
+            }
+            // nvmeof_services[group_key].insert(gw_id->second);
+            // maxlen = std::max(maxlen,
+            //     p.first.size() + group->second.size() + pool->second.size() + 4
+            //   ); // nvmeof (pool.group):
+          }
+        }
+      }
       std::map<std::string, std::list<BeaconListener>> subsystem_listeners;
       for (auto& gw_created_pair: map.created_gws[group_key]) {
         auto& state = gw_created_pair.second;
