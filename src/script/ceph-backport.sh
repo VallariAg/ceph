@@ -1446,7 +1446,7 @@ while true ; do
         --usage) ADVICE="$1" ; USAGE_ADVICE="$1" ; shift ;;
         --verbose|-v) VERBOSE="$1" ; shift ;;
         --version) display_version_message_and_exit ;;
-        --) shift ; ISSUE="$1" ; break ;;
+        --) shift ; ISSUE="78775" ; break ;;
         *) echo "Internal error" ; false ;;
     esac
 done
