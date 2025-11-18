@@ -21,7 +21,7 @@ discovery() {
 connect() {
     sudo nvme connect -t tcp --traddr $NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS -s $NVMEOF_PORT -n "${NVMEOF_SUBSYSTEMS_PREFIX}1"
     sleep 5
-    output=$(sudo nvme list --output-format=json)
+    output=$(sudo nvme list)
     if ! echo "$output" | grep -q "$SPDK_CONTROLLER"; then
         return 1
     fi
@@ -39,7 +39,7 @@ connect_all() {
     sudo nvme connect-all --traddr=$NVMEOF_DEFAULT_GATEWAY_IP_ADDRESS --transport=tcp -l 3600
     sleep 5
     expected_devices_count=$1
-    actual_devices=$(sudo nvme list --output-format=json | grep -o "$SPDK_CONTROLLER" | wc -l)
+    actual_devices=$(sudo nvme list | grep -o "$SPDK_CONTROLLER" | wc -l)
     if [ "$actual_devices" -ne "$expected_devices_count" ]; then
         sudo nvme list --output-format=json
         return 1
