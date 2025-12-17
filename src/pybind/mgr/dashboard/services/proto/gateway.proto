@@ -10,6 +10,8 @@
 
 syntax = "proto3";
 
+option go_package = "github.com/ceph/ceph-nvmeof/lib/go/nvmeof";
+
 enum AddressFamily {
 	ipv4 = 0;
 	ipv6 = 1;
@@ -62,6 +64,9 @@ service Gateway {
 
 	// Changes namespace's visibility
 	rpc namespace_change_visibility(namespace_change_visibility_req) returns (req_status) {}
+
+	// Changes namespace's location
+	rpc namespace_change_location(namespace_change_location_req) returns (req_status) {}
 
 	// Set namespace's RBD trash image flag
 	rpc namespace_set_rbd_trash_image(namespace_set_rbd_trash_image_req) returns (req_status) {}
@@ -153,6 +158,9 @@ message namespace_add_req {
 	optional bool trash_image = 12;
 	optional bool disable_auto_resize = 13;
 	optional bool read_only = 14;
+	optional string rbd_data_pool_name = 15;
+	optional string location = 16;
+	optional string rados_namespace_name = 17;
 }
 
 message namespace_resize_req {
@@ -192,6 +200,12 @@ message namespace_change_visibility_req {
 	uint32 nsid = 2;
 	bool auto_visible = 3;
 	optional bool force = 4;
+}
+
+message namespace_change_location_req {
+	string subsystem_nqn = 1;
+	uint32 nsid = 2;
+	optional string location = 3;
 }
 
 message namespace_set_rbd_trash_image_req {
@@ -234,11 +248,14 @@ message create_subsystem_req {
 	optional bool no_group_append = 5;
 	optional string dhchap_key = 6;
 	optional bool key_encrypted = 7;
+	optional string network_mask = 8;
+	optional bool secure_listeners = 9;
 }
 
 message delete_subsystem_req {
 	string subsystem_nqn = 1;
 	optional bool force = 2;
+	optional bool i_am_sure = 3;
 }
 
 message change_subsystem_key_req {
@@ -279,6 +296,7 @@ message list_hosts_req {
 
 message list_connections_req {
 	string subsystem = 1;
+	optional bool clear_alerts = 2;
 }
 
 message create_listener_req {
@@ -473,6 +491,7 @@ message gateway_info {
 	optional uint32 max_hosts_per_subsystem = 15;
 	optional uint32 max_namespaces_per_subsystem = 16;
 	optional uint32 max_hosts = 17;
+        optional bool gateway_initialization_over = 18;
 }
 
 message cli_version {
@@ -517,6 +536,7 @@ message listener_info {
 	uint32 trsvcid = 5;
 	optional bool secure = 6;
 	optional bool active = 7;
+	optional bool manual = 8;	
 }
 
 message listeners_info {
@@ -596,6 +616,9 @@ message namespace_cli {
         optional string cluster_name = 19;
         optional uint32 configured_load_balancing_group = 20;
 	optional bool image_was_shrunk = 21;
+	optional string rbd_data_pool_name = 22;
+	optional string location = 23;
+	optional string rados_namespace_name = 24;
 }
 
 message namespaces_info {
