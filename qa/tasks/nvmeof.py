@@ -4,6 +4,8 @@ import time
 from collections import defaultdict
 from datetime import datetime
 from textwrap import dedent
+from io import BytesIO, StringIO
+
 from gevent.event import Event
 from gevent.greenlet import Greenlet
 from teuthology.task import Task
@@ -398,12 +400,14 @@ class NvmeofThrasher(Thrasher, Greenlet):
                 for dev in self.devices:
                     device_check_cmd = [
                         'sudo', 'nvme', 'list-subsys', dev,
-                        run.Raw('|'), 'grep', 'live optimized'
                     ]
-                    initiator_host.run(args=device_check_cmd)
+                    r = initiator_host.run(args=device_check_cmd, stdout=BytesIO(), stderr=StringIO())
+                    stdout = r.stdout.getvalue().decode()
+                    if 'live optimized' not in stdout:
+                        self.log(f'Failed to assert "live optimized" on {dev}')
                 break
             except run.CommandFailedError:
-                self.log(f"retry do_checks() for {retry} time")
+                self.log(f"retry do_checks() for {retry+1} time")
 
     def switch_task(self):
         """
