@@ -33,6 +33,7 @@ from . import mgr
 from .controllers import nvmeof  # noqa # pylint: disable=unused-import
 from .controllers import Router, json_error_page
 from .grafana import push_local_dashboards
+from .services.nvmeof_top_cli import NvmeofTopCollector
 from .services import nvmeof_cli, nvmeof_top_cli # noqa # pylint: disable=unused-import
 from .services.auth import AuthManager, AuthManagerTool, JwtManager
 from .services.exception import dashboard_exception_handler
@@ -302,6 +303,9 @@ class Module(MgrModule, CherryPyConfig):
         self.ACCESS_CTRL_DB = None
         self.SSO_DB = None
         self.health_checks = {}
+        self.nvmeof_collector = NvmeofTopCollector()
+        # self.nvmeof_collector = None
+        logger.info('VALLARI_DEBUG: self.nvmeof_collector initailised')
 
     @classmethod
     def can_run(cls):
@@ -553,6 +557,9 @@ class Module(MgrModule, CherryPyConfig):
                 self.__pool_stats[pool_id][stat_name].append((now, stat_val))
 
         return self.__pool_stats
+
+    def get_nvmeof_collector(self):
+        return self.nvmeof_collector
 
     def config_notify(self):
         """
