@@ -3,6 +3,9 @@ tasks:
 - install:
     extra_packages:
         - nvme-cli
+    exclude_packages:
+        - ceph-osd-classic
+        - ceph-osd-crimson
 - cephadm:
 - cephadm.shell:
     host.a:
