@@ -6,6 +6,10 @@ tasks:
     image: quay.ceph.io/ceph-ci/ceph:squid-nvmeof
     compiled_cephadm_branch: squid-nvmeof
 
+- cephadm.shell:
+    mon.a:
+      - ceph config set client debug_mon 20/20
+
 - nvmeof:
     installer: host.a
     rbd:
