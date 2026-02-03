@@ -1,4 +1,26 @@
 tasks:
+
+- exec:
+    client.1:
+      - export CONTAINER_SHA=$(sudo podman ps | grep nvmeof | awk '{ print $1 }')
+      - sudo podman logs $CONTAINER_SHA 2>&1 | tee $TESTDIR/archive/container-nvmeof-a.log
+
+- exec:
+    client.2:
+      - export CONTAINER_SHA=$(sudo podman ps | grep nvmeof | awk '{ print $1 }')
+      - sudo podman logs $CONTAINER_SHA 2>&1 | tee $TESTDIR/archive/container-nvmeof-b.log
+
+- exec:
+    client.3:
+      - export CONTAINER_SHA=$(sudo podman ps | grep nvmeof | awk '{ print $1 }')
+      - sudo podman logs $CONTAINER_SHA 2>&1 | tee $TESTDIR/archive/container-nvmeof-c.log
+
+- exec:
+    client.4:
+      - export CONTAINER_SHA=$(sudo podman ps | grep nvmeof | awk '{ print $1 }')
+      - sudo podman logs $CONTAINER_SHA 2>&1 | tee $TESTDIR/archive/container-nvmeof-d.log
+         
+
 - workunit:
     no_coverage_and_limits: true
     clients:
