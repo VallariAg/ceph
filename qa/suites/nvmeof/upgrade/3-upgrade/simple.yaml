@@ -15,6 +15,8 @@ tasks:
       - ceph health detail
       - ceph orch ps
       - ceph -s
+      - ceph nvme-gw show mypool mygroup0
+      - ceph config set client debug_mon 20/20
       # upgrade
       - ceph config set mon mon_warn_on_insecure_global_id_reclaim false --force
       - ceph config set mon mon_warn_on_insecure_global_id_reclaim_allowed false --force
