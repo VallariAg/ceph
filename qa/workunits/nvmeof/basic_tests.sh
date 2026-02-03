@@ -2,7 +2,12 @@
 
 sudo modprobe nvme-fabrics
 sudo modprobe nvme-tcp
-sudo dnf reinstall nvme-cli -y
+# sudo dnf reinstall nvme-cli -y
+curl -O https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/nvme-cli-2.13-1.el9.x86_64.rpm
+curl -O https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libnvme-1.13-1.el9.x86_64.rpm
+ls -l nvme-cli-2.13-1.el9.x86_64.rpm libnvme-1.13-1.el9.x86_64.rpm
+sudo rpm -qp --qf "%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n" nvme-cli-2.13-1.el9.x86_64.rpm   # should print nvme-cli-2.13-1.el9.x86_64
+sudo dnf downgrade ./nvme-cli-2.13-1.el9.x86_64.rpm ./libnvme-1.13-1.el9.x86_64.rpm -y
 sudo lsmod | grep nvme
 nvme version
 
