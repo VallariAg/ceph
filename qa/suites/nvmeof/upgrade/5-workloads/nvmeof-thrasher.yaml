@@ -1,24 +1,24 @@
 tasks:
 
-- exec:
-    client.1:
-      - export CONTAINER_SHA=$(sudo systemctl | grep nvmeof | awk '{ print $1 }')
-      - sudo journalctl -u $CONTAINER_SHA > /home/ubuntu/cephtest/archive/container-nvmeof-a.log
+# - exec:
+#     client.1:
+#       - export CONTAINER_SHA=$(sudo systemctl | grep nvmeof | awk '{ print $1 }')
+#       - sudo journalctl -u $CONTAINER_SHA | tee /home/ubuntu/cephtest/archive/container-nvmeof-a.log
 
-- exec:
-    client.2:
-      - export CONTAINER_SHA=$(sudo systemctl | grep nvmeof | awk '{ print $1 }')
-      - sudo podman logs $CONTAINER_SHA 2>&1 > $TESTDIR/archive/container-nvmeof-b.log
+# - exec:
+#     client.2:
+#       - export CONTAINER_SHA=$(sudo systemctl | grep nvmeof | awk '{ print $1 }')
+#       - sudo podman logs $CONTAINER_SHA 2>&1 > $TESTDIR/archive/container-nvmeof-b.log
 
-- exec:
-    client.3:
-      - export CONTAINER_SHA=$(sudo systemctl | grep nvmeof | awk '{ print $1 }')
-      - sudo podman logs $CONTAINER_SHA 2>&1 | sudo tee $TESTDIR/archive/container-nvmeof-c.log
+# - exec:
+#     client.3:
+#       - export CONTAINER_SHA=$(sudo systemctl | grep nvmeof | awk '{ print $1 }')
+#       - sudo podman logs $CONTAINER_SHA 2>&1 | sudo tee $TESTDIR/archive/container-nvmeof-c.log
 
-- exec:
-    client.4:
-      - export CONTAINER_SHA=$(sudo systemctl | grep nvmeof | awk '{ print $1 }')
-      - sudo podman logs $CONTAINER_SHA 2>&1 | sudo tee $TESTDIR/archive/container-nvmeof-d.log
+# - exec:
+#     client.4:
+#       - export CONTAINER_SHA=$(sudo systemctl | grep nvmeof | awk '{ print $1 }')
+#       - sudo podman logs $CONTAINER_SHA 2>&1 | sudo tee $TESTDIR/archive/container-nvmeof-d.log
          
 
 - workunit:
