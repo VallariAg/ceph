@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     else:
         from typing_extensions import Literal
 
+import uuid
 import cephfs
 import inspect
 import logging
@@ -545,6 +546,38 @@ class CLICommand(object):
     def dump_cmd_list(cls) -> List[Dict[str, Union[str, bool]]]:
         return [cmd.dump_cmd() for cmd in cls.COMMANDS.values()]
 
+class SessionCLICommand(CLICommand):
+    def call(self, mgr, cmd_dict, inbuf=None):
+        kwargs, specials = self._collect_args_by_argspec(cmd_dict)
+
+        if inbuf:
+            if 'inbuf' not in specials:
+                return HandleCommandResult(
+                    -errno.EINVAL,
+                    '',
+                    'Invalid command: Input file data (-i) not supported',
+                )
+            kwargs['inbuf'] = inbuf
+
+        # ✅ Inject session_id only for polling commands
+        if self.poll:
+            if '_id' not in cmd_dict:
+                cmd_dict['_id'] = str(uuid.uuid4()) 
+            # if not hasattr(mgr, "_session_ids"):
+            #     mgr._session_ids = {}
+
+            # fingerprint = self.prefix + ":" + json.dumps(cmd_dict, sort_keys=True)
+            
+            # if fingerprint not in mgr._session_ids:
+            #     mgr._session_ids[fingerprint] = str(uuid.uuid4())
+
+            kwargs["session_id"] = cmd_dict['_id']
+
+        assert self.func
+        return self.func(mgr, **kwargs)
+
+def CLIReadCommandWithSession(prefix: str, poll: bool = False):
+    return SessionCLICommand(prefix, "r", poll)
 
 def CLIReadCommand(prefix: str, poll: bool = False) -> CLICommand:
     return CLICommand(prefix, "r", poll)

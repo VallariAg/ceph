@@ -7,9 +7,10 @@ import time
 import logging
 import grpc
 import asyncio
+import uuid
 
 from .. import mgr
-from mgr_module import CLIReadCommand, HandleCommandResult
+from mgr_module import CLIReadCommand, HandleCommandResult, CLICommand, CLIReadCommandWithSession
 
 from .nvmeof_client import NVMeoFClient
 
@@ -112,10 +113,19 @@ class NVMeoFTop:
 def get_collector():
     return mgr.get_nvmeof_collector()
 
-@CLIReadCommand('nvmeof top cpu', poll=True)
-def nvmeof_top(_, delay: int = 3):
+
+@CLIReadCommandWithSession('nvmeof top test', poll=True)
+def nvmeof_top(_, subsystem: str, delay: int = 3,
+               server_addr: str = '', group: str = '',
+               descending: bool = False, sort_by: str = 'NSID',
+               with_timestamp: bool = False, no_headings: bool = False,
+               no_summary: bool = False, cpu: bool = False,
+               session_id: str = None):
+
+# @CLIReadCommandWithSession('nvmeof top cpu', poll=True)
+# def nvmeof_top(_, delay: int = 3):
     tstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
-    output = f"{tstamp} \n testing testing2 \n"
+    output = f"{tstamp} \n testing testing2 {session_id=} \n"
     time.sleep(delay)
     logger.info(f"VALLARI_DEBUG mgr object?? {mgr}")
     return HandleCommandResult(stdout=output, retval=0)
