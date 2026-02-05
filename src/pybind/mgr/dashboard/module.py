@@ -303,9 +303,7 @@ class Module(MgrModule, CherryPyConfig):
         self.ACCESS_CTRL_DB = None
         self.SSO_DB = None
         self.health_checks = {}
-        self.nvmeof_collector = NvmeofTopCollector()
-        # self.nvmeof_collector = None
-        logger.info('VALLARI_DEBUG: self.nvmeof_collector initailised')
+        self.nvmeof_collectors = {}
 
     @classmethod
     def can_run(cls):
@@ -557,9 +555,29 @@ class Module(MgrModule, CherryPyConfig):
                 self.__pool_stats[pool_id][stat_name].append((now, stat_val))
 
         return self.__pool_stats
+    
+    def get_nvmeof_collector(self, session_id: str = ''):
+        def _expire_old_sessions():
+            now = time.time()
+            expired = []
 
-    def get_nvmeof_collector(self):
-        return self.nvmeof_collector
+            for _id in list(self.nvmeof_collectors.keys()):
+                collector = self.nvmeof_collectors[_id]
+                # TODO: use 'period' instead of collector.delay here
+                expire_time = collector.timestamp + (10 * collector.delay)
+                if now > expire_time:
+                    logger.info(f'VALLARI_EXPIRE: {now=} {expire_time=}')
+                    expired.append(_id)
+
+            for _id in expired:
+                self.nvmeof_collectors.pop(_id, None)
+
+        _expire_old_sessions()
+        
+        if session_id not in self.nvmeof_collectors:
+            self.nvmeof_collectors[session_id] = NvmeofTopCollector()
+        logger.info(f'VALLARI_DEBUG: {self.nvmeof_collectors=}')
+        return self.nvmeof_collectors[session_id]
 
     def config_notify(self):
         """
