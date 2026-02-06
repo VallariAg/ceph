@@ -556,17 +556,20 @@ class Module(MgrModule, CherryPyConfig):
 
         return self.__pool_stats
     
-    def get_nvmeof_collector(self, session_id: str = ''):
+    def get_nvmeof_collector(self, session_id: str = '', ttl: int = 3600):
         def _expire_old_sessions():
             now = time.time()
             expired = []
 
             for _id in list(self.nvmeof_collectors.keys()):
                 collector = self.nvmeof_collectors[_id]
-                # TODO: use 'period' instead of collector.delay here
-                expire_time = collector.timestamp + (10 * collector.delay)
+                delay = collector.delay
+                if delay < 1:
+                    expire_time = collector.timestamp + ttl
+                else:
+                    expire_time = collector.timestamp + (5 * collector.delay)
                 if now > expire_time:
-                    logger.info(f'VALLARI_EXPIRE: {now=} {expire_time=}')
+                    logger.info(f'VALLARI_EXPIRE: {_id=} {now=} {expire_time=} {collector.delay=}')
                     expired.append(_id)
 
             for _id in expired:
