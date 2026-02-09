@@ -33,21 +33,7 @@ class NVMeoFTopTool:
         self.collector: NvmeofTopCollector = data_collector
         self.reverse_sort = args.get('sort_descending', False)
         self.sort_key = args.get('sort_by')
-        # self.status_code = 0
-
-    # def get_batch(self) -> None:
-    #     rt_stdout = ""
-    #     try:
-    #         if not self.collector.ready:
-    #             self.status_code = self.collector.health.rc
-    #             return self.collector.health.msg 
-
-    #         rt_stdout += self.to_stdout()
-    #     except KeyboardInterrupt:
-    #         logger.info("nvmeof-top stopped by user")
-
-    #     rt_stdout += "\n ---- "
-    #     return rt_stdout
+        self.group = args.get('group')
    
     def run(self) -> None:
         self.collector.initialise(self)
@@ -57,12 +43,16 @@ class NVMeoFTopTool:
 
         t = threading.Thread(target=self._run, daemon=True)
         t.start()
+        t.join()
 
-        if not self.collector.ready:
+        # with self.collector.lock:
+        logger.info("VALLARI_DEBUG: collector func must be done?")
+        if not self.collector.ready: # TODO: code doesn't error here (when health goes bad in collect_ method)
             status_code = self.collector.health.rc
             return (status_code, self.collector.health.msg)
         
         try:
+            logger.info("VALLARI_DEBUG: calling stdout()")
             rt_stdout = self.to_stdout()
             rt_stdout += "\n ---- "
             return (0, rt_stdout)
@@ -88,14 +78,14 @@ class NVMeoFTopCPU(NVMeoFTopTool):
 
     def _run(self):
         if self.collector.ready:
-            with self.collector.lock:
-                asyncio.run(self.collector.collect_cpu_data())
+            # with self.collector.lock:
+            asyncio.run(self.collector.collect_cpu_data())
 
     def to_stdout(self):
         sort_pos = NVMeoFTopCPU.reactors_headers.index(self.sort_key)
-        with self.collector.lock:
-            reactor_data = self.collector.get_reactor_data(sort_pos=sort_pos, 
-                                                           reverse_sort=self.reverse_sort)
+        # with self.collector.lock:
+        reactor_data = self.collector.get_reactor_data(sort_pos=sort_pos, 
+                                                       reverse_sort=self.reverse_sort)
         rows = []
         if self.args.get('with_timestamp'):
             tstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.collector.timestamp))
@@ -113,9 +103,6 @@ class NVMeoFTopIO(NVMeoFTopTool):
     subsystem_summary_headers = ['Subsystem', 'Namespaces', 'Total IOPS', 'Throughput']
     summary_headers = ['Gateway', 'Total Subsystems', 'Total Namespaces']
 
-    # reactors_headers = ['Thread Name', 'Busy Rate%', 'Idle Rate%']
-    # reactors_template = "{:<40}   {:>30}   {:>30}\n"
-
     ns_headers = ['NSID', 'RBD Image', 'IOPS', 'r/s', 'rMB/s', 'r_await', 'rareq-sz', 'w/s', 'wMB/s', 'w_await', 'wareq-sz', 'LBGrp', 'QoS']
     ns_template = "{:>4}   {:<40}   {:>7}   {:>6}   {:>6}   {:>7}   {:>8}   {:>6}   {:>6}   {:>7}   {:>8}   {:^5}   {:>3}\n"
 
@@ -125,19 +112,17 @@ class NVMeoFTopIO(NVMeoFTopTool):
 
     def _run(self):
         if self.collector.ready:
-            with self.collector.lock:
-                asyncio.run(self.collector.collect_io_data())
+            # with self.collector.lock:
+            asyncio.run(self.collector.collect_io_data())
 
     def to_stdout(self):
-        """Dump namespace performance stats to stdout"""
-        assert self.args.get('subsystem')
         logger.info("writing stats to stdout")
         sort_pos = NVMeoFTopIO.ns_headers.index(self.sort_key)
-        with self.collector.lock:
-            ns_data = self.collector.get_sorted_namespaces(sort_pos=sort_pos, 
-                                                           reverse_sort=self.reverse_sort)
-            subsystem_summary_data = self.collector.get_subsystem_summary_data()
-            overall_summary_data = self.collector.get_overall_summary_data()
+        # with self.collector.lock:
+        ns_data = self.collector.get_sorted_namespaces(sort_pos=sort_pos, 
+                                                        reverse_sort=self.reverse_sort)
+        subsystem_summary_data = self.collector.get_subsystem_summary_data()
+        overall_summary_data = self.collector.get_overall_summary_data()
 
         rows = []
         if self.args.get('with_timestamp'):
@@ -189,15 +174,19 @@ def nvmeof_top_cpu(_, service: str = '',
         'server_addr': server_addr,
         'group': group,
     }
-    gateway_client = NVMeoFClient(group, server_addr)
-    data_collector = get_collector(session_id)
+    try:
+        gateway_client = NVMeoFClient(group, server_addr)
+        data_collector = get_collector(session_id)
 
-    top_tool = NVMeoFTopCPU(args, gateway_client, data_collector) 
-    rc, output = top_tool.run()
-    return HandleCommandResult(stdout=output, retval=rc) 
+        top_tool = NVMeoFTopCPU(args, gateway_client, data_collector) 
+        rc, output = top_tool.run()
+        return HandleCommandResult(stdout=output, retval=rc) 
+    except Exception as exc:
+        logger.exception(exc)
+        return HandleCommandResult(stderr=str(exc), retval=8) #TODO: change return code? 
 
 @CLIReadCommand('nvmeof top io', poll=True)
-def nvmeof_top_io(_, subsystem: str,
+def nvmeof_top_io(_, subsystem: str = '',
                 server_addr: str = '', group: str = '',
                 descending: bool = False, sort_by: str = 'NSID',
                 with_timestamp: bool = False,
@@ -225,12 +214,19 @@ def nvmeof_top_io(_, subsystem: str,
         'server_addr': server_addr,
         'group': group,
     }
-    gateway_client = NVMeoFClient(group, server_addr)
-    data_collector = get_collector(session_id)
+    try:
+        if not subsystem:
+            err_message = "Required argument 'subsystem' missing"
+            return HandleCommandResult(stderr=err_message, retval=8) #TODO: change return code? 
+        gateway_client = NVMeoFClient(group, server_addr)
+        data_collector = get_collector(session_id)
 
-    top_tool = NVMeoFTopIO(args, gateway_client, data_collector) 
-    rc, output = top_tool.run()
-    return HandleCommandResult(stdout=output, retval=rc)
+        top_tool = NVMeoFTopIO(args, gateway_client, data_collector) 
+        rc, output = top_tool.run()
+        return HandleCommandResult(stdout=output, retval=rc)
+    except Exception as exc:
+        logger.exception(exc)
+        return HandleCommandResult(stderr=str(exc), retval=8) #TODO: change return code? 
 
 
 class Health:
@@ -320,9 +316,7 @@ class ReactorStats:
 
 class NvmeofTopCollector:
     def __init__(self):
-        # self.parent = parent
-        # self.client = self.parent.client
-        self.tool = None
+        self.cmd_handler = None
         self.subsystem_nqn = ''
         self.server_addr = ''
         self.delay = 1000
@@ -331,7 +325,7 @@ class NvmeofTopCollector:
         self.reactor_stats = {}
         self.iostats = {}
         self.iostats_lock = threading.Lock()
-        self.lock = threading.Lock()
+        # self.lock = threading.Lock()
         self.gw_info = None
         self.timestamp = time.time()
         self.health = Health()
@@ -499,12 +493,14 @@ class NvmeofTopCollector:
         return self.call_grpc_api('list_namespaces', NVMeoFClient.pb2.list_namespaces_req(subsystem=subsystem_nqn))
 
     def _get_threads_stats(self, client):
+        gateway_addr = client.gateway_addr
+        logger.debug(f"fetching iostats for {gateway_addr}")
         with self.iostats_lock:
             logger.debug('calling get_thread_stats')
             stats = self.call_grpc_api('get_thread_stats', 
                                        NVMeoFClient.pb2.get_thread_stats_req(), client)
             logger.info(f'calling get_thread_stats {stats=}')
-            gateway_addr = client.gateway_addr
+            
             if gateway_addr not in self.reactor_stats:
                 self.reactor_stats[gateway_addr] = {}
             tick_rate = stats.tick_rate
@@ -527,10 +523,10 @@ class NvmeofTopCollector:
         return self.call_grpc_api('list_subsystems', NVMeoFClient.pb2.list_subsystems_req())
 
     # collector methods
-    def initialise(self, tool):
-        self.tool = tool
-        self.server_addr = tool.server_addr
-        self.client = tool.client
+    def initialise(self, cmd_handler):
+        self.cmd_handler = cmd_handler
+        self.server_addr = cmd_handler.server_addr
+        self.client = cmd_handler.client
 
         logger.info(f"VALLARI_DEBUG_DELAY 1 {self.timestamp}")
         now = time.time()
@@ -545,25 +541,26 @@ class NvmeofTopCollector:
             self.health.msg = f"Unable to connect to {self.server_addr}, pass an available gateway as --server-addr"
             return
 
-        # if self.total_subsystems == 0:
-        #     self.health.rc = 8
-        #     self.health.msg = 'No subsystems found'
-        #     return
-
         self.log_connection()
 
     async def collect_cpu_data(self):
+        logger.info(f"VALLARI_DEBUG: collect_cpu_data")
         tasks = []
-        service_name = self.tool.gws_service
+        service_name = self.cmd_handler.gws_service
+        group = self.cmd_handler.group
         logger.info(f"{service_name=}")
         if service_name:
             gw_conf = NvmeofGatewaysConfig.get_gateways_config()
-            if service_name not in gw_conf["gateways"]:
+            gws = gw_conf["gateways"] # TODO: remove line
+            logger.info(f"VALLARI_DEBUG_SERVICE: {gws=}")
+            if service_name not in gw_conf["gateways"]: # TODO: code  does not reach here! why? 
+                logger.info(f"VALLARI_DEBUG_SER: service name not found")
                 self.health.rc = 8
                 self.health.msg = f'Service {service_name} not found'
                 return
             for gw in gw_conf["gateways"][service_name]:
-                client = NVMeoFClient(None, gw["service_url"])
+                logger.info(f"VALLARI_DEBUG_SER: {gw=}")
+                client = NVMeoFClient(group, gw["service_url"])
                 r = asyncio.create_task(asyncio.to_thread(self._get_threads_stats, client))
                 tasks.append(r)
         else:
@@ -571,9 +568,11 @@ class NvmeofTopCollector:
             r = asyncio.create_task(asyncio.to_thread(self._get_threads_stats, self.client))
             tasks.append(r)
         await asyncio.gather(*tasks)
+        logger.debug("collect_cpu_data tasks completed")
 
     async def collect_io_data(self):
-        self.subsystem_nqn = self.tool.subsystem_nqn
+        logger.info(f"VALLARI_DEBUG: collect_io_data")
+        self.subsystem_nqn = self.cmd_handler.subsystem_nqn
 
         self.subsystems = self._get_all_subsystems()
         if self.subsystems.status > 0:
@@ -605,28 +604,7 @@ class NvmeofTopCollector:
         for ns in self.namespaces[self.subsystem_nqn]:
             t = asyncio.create_task(asyncio.to_thread(self._get_ns_iostats, ns))
             tasks.append(t)
-        # subsystem_task = asyncio.create_task(asyncio.to_thread(self._get_all_subsystems))
-        # tasks.extend([subsystem_task])
-        # if self.show_cpu:
-        #     r = asyncio.create_task(asyncio.to_thread(self._get_threads_stats))
-        #     tasks.append(r)
 
         await asyncio.gather(*tasks)
-        # self.subsystems = subsystem_task.result()
-        logger.debug("tasks completed")
-
-    # async def start(self):
-    #     now = time.time()
-    #     self.delay = int(now - self.timestamp)
-    #     self.timestamp = now
-    #     await self.collect_io_data()
-
-    # def run(self, cmd):
-    #     if self.ready:
-    #         with self.lock:
-    #             if cmd == "io":
-    #                 asyncio.run(self.collect_io_data())
-    #             elif cmd == "cpu":
-    #                 asyncio.run(self.collect_cpu_data())
-
+        logger.debug("collect_io_data tasks completed")
 
