@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 import requests
+from cherrypy_mgr import CherryPyMgr
 
 from .. import mgr
 from ..exceptions import DashboardException
@@ -545,7 +546,9 @@ class MultiClusterUi(RESTController):
     @Endpoint('PUT')
     @UpdatePermission
     def set_cors_endpoint(self, url: str):
-        configure_cors(url)
+        config = CherryPyMgr.get_server_config(name='ceph-dashboard')
+        target_conf = config if config is not None else {}
+        configure_cors(target_conf, url=url)
 
     @Endpoint('GET')
     @ReadPermission

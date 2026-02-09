@@ -840,7 +840,7 @@ def merge_list_of_dicts_by_key(target_list: list, source_list: list, key: str):
     return target_list
 
 
-def configure_cors(url: str = ''):
+def configure_cors(config: Dict[str, Dict[str, Any]], url: str = ''):
     """
     Allow CORS requests if the cross_origin_url option is set.
     """
@@ -850,11 +850,9 @@ def configure_cors(url: str = ''):
     else:
         cross_origin_url = mgr.get_localized_module_option('cross_origin_url', '')
     if cross_origin_url:
-        cherrypy.tools.CORS = cherrypy.Tool('before_handler', cors_tool)
-        config = {
-            'tools.CORS.on': True,
-        }
-        cherrypy.config.update(config)
+        if not hasattr(cherrypy.tools, 'CORS'):
+            cherrypy.tools.CORS = cherrypy.Tool('before_handler', cors_tool)
+        config['/']['tools.CORS.on'] = True
 
 
 def cors_tool():
