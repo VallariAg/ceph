@@ -62,6 +62,7 @@ else:
                     None
                 )
                 if matched_gateway:
+                    self.daemon_name = matched_gateway.get('daemon_name')
                     self.gateway_addr = matched_gateway.get('service_url')
                     logger.debug("Gateway address set to: %s", self.gateway_addr)
             enable_auth = is_mtls_enabled(service_name)
@@ -80,6 +81,7 @@ else:
                 logger.info("Insecurely connecting to: %s", self.gateway_addr)
                 self.channel = grpc.insecure_channel(self.gateway_addr)
             self.stub = pb2_grpc.GatewayStub(self.channel)
+            self.service_name = service_name
 
     Model = Dict[str, Any]
     Collection = List[Model]
