@@ -81,6 +81,90 @@ else:
                 self.channel = grpc.insecure_channel(self.gateway_addr)
             self.stub = pb2_grpc.GatewayStub(self.channel)
 
+        def get_gateway_info(self):
+            return self.stub.get_gateway_info(self.pb2.get_gateway_info_req())
+
+        def get_gateway_stats(self):
+            return self.stub.get_gateway_stats(self.pb2.get_gateway_stats_req())
+
+        def get_gw_version(self):
+            gw_info = self.get_gateway_info()
+            return self.pb2.gw_version(status=gw_info.status,
+                                       error_message=gw_info.error_message,
+                                       version=gw_info.version)
+
+        def get_gateway_log_level(self):
+            return self.stub.get_gateway_log_level(self.pb2.get_gateway_log_level_req())
+
+        def set_gateway_log_level(self, log_level):
+            return self.stub.stub.set_gateway_log_level(
+                self.pb2.set_gateway_log_level_req(log_level=log_level)
+            )
+
+        def show_gateway_listeners_info(self, nqn):
+            return self.stub.show_gateway_listeners_info(
+                self.pb2.show_gateway_listeners_info_req(subsystem_nqn=nqn)
+            )
+
+        def get_spdk_nvmf_log_flags_and_level(self, all_log_flags):
+            return self.stub.get_spdk_nvmf_log_flags_and_level(
+                self.pb2.get_spdk_nvmf_log_flags_and_level_req(all_log_flags=all_log_flags)
+            )
+
+        def set_spdk_nvmf_logs(self, log_level, print_level, extra_log_flags):
+            return self.stub.set_spdk_nvmf_logs(
+                self.pb2.set_spdk_nvmf_logs_req(log_level=log_level,
+                                                print_level=print_level,
+                                                extra_log_flags=extra_log_flags)
+            )
+
+        def disable_spdk_nvmf_logs(self, extra_log_flags):
+            return self.stub.disable_spdk_nvmf_logs(
+                self.pb2.disable_spdk_nvmf_logs_req(extra_log_flags=extra_log_flags)
+            )
+
+        def list_subsystems(self, nqn = None):
+            if not nqn:
+                return self.stub.list_subsystems(
+                    self.pb2.list_subsystems_req(subsystem_nqn=nqn)
+                )
+            return self.stub.list_subsystems(
+                self.pb2.list_subsystems_req()
+            )
+
+        def create_subsystem(self, subsystem_nqn, serial_number, max_namespaces, 
+                             enable_ha, no_group_append, dhchap_key):
+            return self.stub.create_subsystem(
+                self.pb2.create_subsystem_req(
+                    subsystem_nqn=subsystem_nqn,
+                    serial_number=serial_number,
+                    max_namespaces=max_namespaces,
+                    enable_ha=enable_ha,
+                    no_group_append=no_group_append,
+                    dhchap_key=dhchap_key,
+                )
+            )
+
+        def delete_subsystem(self, subsystem_nqn, force):
+            return self.stub.delete_subsystem(
+                NVMeoFClient.pb2.delete_subsystem_req(
+                    subsystem_nqn=subsystem_nqn, force=force
+                )
+            )
+        
+        def change_subsystem_key(self, subsystem_nqn, dhchap_key):
+            return self.stub.change_subsystem_key(
+                self.pb2.change_subsystem_key_req(
+                    subsystem_nqn=subsystem_nqn, dhchap_key=dhchap_key
+                )
+            )
+
+        def get_subsystems(self):
+            return self.stub.get_subsystems(
+                self.pb2.get_subsystems_req()
+            )
+        # def
+
     Model = Dict[str, Any]
     Collection = List[Model]
 

@@ -43,9 +43,7 @@ else:
             return NVMeoFClient(
                 gw_group=gw_group,
                 server_address=server_address
-            ).stub.get_gateway_info(
-                NVMeoFClient.pb2.get_gateway_info_req()
-            )
+            ).get_gateway_info()
 
         @ReadPermission
         @Endpoint('GET')
@@ -69,15 +67,10 @@ else:
         @convert_to_model(model.GatewayVersion)
         @handle_nvmeof_error
         def version(self, gw_group: Optional[str] = None, server_address: Optional[str] = None):
-            gw_info = NVMeoFClient(
-                gw_group=gw_group,
-                server_address=server_address
-            ).stub.get_gateway_info(
-                NVMeoFClient.pb2.get_gateway_info_req()
-            )
-            return NVMeoFClient.pb2.gw_version(status=gw_info.status,
-                                               error_message=gw_info.error_message,
-                                               version=gw_info.version)
+            return NVMeoFClient(
+                    gw_group=gw_group,
+                    server_address=server_address
+                ).get_gw_version()
 
         @ReadPermission
         @Endpoint('GET', '/log_level')
@@ -90,13 +83,10 @@ else:
         @handle_nvmeof_error
         def get_log_level(self, gw_group: Optional[str] = None,
                           server_address: Optional[str] = None):
-            gw_log_level = NVMeoFClient(
+            return NVMeoFClient(
                 gw_group=gw_group,
                 server_address=server_address
-            ).stub.get_gateway_log_level(
-                NVMeoFClient.pb2.get_gateway_log_level_req()
-            )
-            return gw_log_level
+            ).get_gateway_log_level()
 
         @ReadPermission
         @Endpoint('PUT', '/log_level')
@@ -109,9 +99,7 @@ else:
                           server_address: Optional[str] = None):
             log_level = log_level.lower()
             gw_log_level = NVMeoFClient(gw_group=gw_group,
-                                        server_address=server_address).stub.set_gateway_log_level(
-                NVMeoFClient.pb2.set_gateway_log_level_req(log_level=log_level)
-            )
+                                        server_address=server_address).set_gateway_log_level(log_level)
             return gw_log_level
 
         @ReadPermission
@@ -126,9 +114,7 @@ else:
             gw_stats = NVMeoFClient(
                 gw_group=gw_group,
                 server_address=server_address
-            ).stub.get_gateway_stats(
-                NVMeoFClient.pb2.get_gateway_stats_req()
-            )
+            ).get_gateway_stats()
             return gw_stats
 
         @ReadPermission
@@ -144,9 +130,7 @@ else:
             gw_listener_info = NVMeoFClient(
                 gw_group=gw_group,
                 server_address=server_address
-            ).stub.show_gateway_listeners_info(
-                NVMeoFClient.pb2.show_gateway_listeners_info_req(subsystem_nqn=nqn)
-            )
+            ).show_gateway_listeners_info(nqn)
             return gw_listener_info
 
     @APIRouter("/nvmeof/spdk", Scope.NVME_OF)
@@ -165,9 +149,7 @@ else:
             spdk_log_level = NVMeoFClient(
                 gw_group=gw_group,
                 server_address=server_address
-            ).stub.get_spdk_nvmf_log_flags_and_level(
-                NVMeoFClient.pb2.get_spdk_nvmf_log_flags_and_level_req(all_log_flags=all_log_flags)
-            )
+            ).get_spdk_nvmf_log_flags_and_level(all_log_flags)
             return spdk_log_level
 
         @ReadPermission
@@ -186,11 +168,10 @@ else:
             spdk_log_level = NVMeoFClient(
                 gw_group=gw_group,
                 server_address=server_address
-            ).stub.set_spdk_nvmf_logs(
-                NVMeoFClient.pb2.set_spdk_nvmf_logs_req(log_level=log_level,
-                                                        print_level=print_level,
-                                                        extra_log_flags=extra_log_flags)
-            )
+            ).set_spdk_nvmf_logs(
+                log_level=log_level,
+                print_level=print_level,
+                extra_log_flags=extra_log_flags)
             return spdk_log_level
 
         @ReadPermission
@@ -207,9 +188,7 @@ else:
             spdk_log_level = NVMeoFClient(
                 gw_group=gw_group,
                 server_address=server_address
-            ).stub.disable_spdk_nvmf_logs(
-                NVMeoFClient.pb2.disable_spdk_nvmf_logs_req(extra_log_flags=extra_log_flags)
-            )
+            ).disable_spdk_nvmf_logs(extra_log_flags=extra_log_flags)
             return spdk_log_level
 
     @APIRouter("/nvmeof/subsystem", Scope.NVME_OF)
@@ -224,9 +203,7 @@ else:
             return NVMeoFClient(
                 gw_group=gw_group,
                 server_address=server_address
-            ).stub.list_subsystems(
-                NVMeoFClient.pb2.list_subsystems_req()
-            )
+            ).list_subsystems()
 
         @pick(field="subsystems", first=True)
         @NvmeofCLICommand("nvmeof subsystem get", model.SubsystemList)
@@ -245,9 +222,7 @@ else:
             return NVMeoFClient(
                 gw_group=gw_group,
                 server_address=server_address
-            ).stub.list_subsystems(
-                NVMeoFClient.pb2.list_subsystems_req(subsystem_nqn=nqn)
-            )
+            ).list_subsystems(nqn)
 
         @empty_response
         @NvmeofCLICommand("nvmeof subsystem add", model.RequestStatus)
@@ -274,12 +249,10 @@ else:
             return NVMeoFClient(
                 gw_group=gw_group,
                 server_address=server_address
-            ).stub.create_subsystem(
-                NVMeoFClient.pb2.create_subsystem_req(
+            ).create_subsystem(
                     subsystem_nqn=nqn, serial_number=serial_number,
                     max_namespaces=max_namespaces, enable_ha=enable_ha,
                     no_group_append=no_group_append, dhchap_key=dhchap_key
-                )
             )
 
         @empty_response
@@ -300,10 +273,8 @@ else:
             return NVMeoFClient(
                 gw_group=gw_group,
                 server_address=server_address
-            ).stub.delete_subsystem(
-                NVMeoFClient.pb2.delete_subsystem_req(
-                    subsystem_nqn=nqn, force=str_to_bool(force)
-                )
+            ).delete_subsystem(
+                subsystem_nqn=nqn, force=str_to_bool(force)
             )
 
         @EndpointDoc(
@@ -324,10 +295,8 @@ else:
             return NVMeoFClient(
                 gw_group=gw_group,
                 server_address=server_address
-            ).stub.change_subsystem_key(
-                NVMeoFClient.pb2.change_subsystem_key_req(
+            ).change_subsystem_key(
                     subsystem_nqn=nqn, dhchap_key=dhchap_key
-                )
             )
 
         @EndpointDoc(
@@ -347,10 +316,8 @@ else:
             return NVMeoFClient(
                 gw_group=gw_group,
                 server_address=server_address
-            ).stub.change_subsystem_key(
-                NVMeoFClient.pb2.change_subsystem_key_req(
+            ).change_subsystem_key(
                     subsystem_nqn=nqn, dhchap_key=None
-                )
             )
 
         @NvmeofCLICommand("nvmeof get_subsystems", model.GetSubsystems)
@@ -364,9 +331,7 @@ else:
             return NVMeoFClient(
                 gw_group=gw_group,
                 server_address=server_address
-            ).stub.get_subsystems(
-                NVMeoFClient.pb2.get_subsystems_req()
-            )
+            ).get_subsystems()
 
     @APIRouter("/nvmeof/subsystem/{nqn}/listener", Scope.NVME_OF)
     @APIDoc("NVMe-oF Subsystem Listener Management API", "NVMe-oF Subsystem Listener")
