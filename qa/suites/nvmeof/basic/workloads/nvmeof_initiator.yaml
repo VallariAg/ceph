@@ -37,3 +37,7 @@ tasks:
       RBD_POOL: mypool
       IOSTAT_INTERVAL: '10'
       RUNTIME: '600'
+
+- pexec:
+    all:
+      - sudo dmesg -T > $TESTDIR/archive/dmesg-fio_tests.log  

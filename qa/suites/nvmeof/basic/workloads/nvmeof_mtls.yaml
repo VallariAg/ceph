@@ -35,3 +35,7 @@ tasks:
     clients:
       client.0:
         - nvmeof/mtls_test.sh
+
+- pexec:
+    all:
+      - sudo dmesg -T > $TESTDIR/archive/dmesg-fio_tests.log  

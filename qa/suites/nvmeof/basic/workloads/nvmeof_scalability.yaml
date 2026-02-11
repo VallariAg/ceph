@@ -53,3 +53,7 @@ tasks:
     env:
       SCALING_DELAYS: '400'
       RUNTIME: '1200'
+
+- pexec:
+    all:
+      - sudo dmesg -T > $TESTDIR/archive/dmesg-fio_tests.log  

@@ -38,3 +38,7 @@ tasks:
       IOSTAT_INTERVAL: '10'
       RUNTIME: '120'
       NEW_NAMESPACES_COUNT: '5'
+
+- pexec:
+    all:
+      - sudo dmesg -T > $TESTDIR/archive/dmesg-fio_tests.log  

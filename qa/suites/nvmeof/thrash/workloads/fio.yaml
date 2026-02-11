@@ -10,3 +10,7 @@ tasks:
       NVMEOF_GROUP: mygroup0
       IOSTAT_INTERVAL: '10'
       RUNTIME: '1200'
+
+- pexec:
+    all:
+      - sudo dmesg -T > $TESTDIR/archive/dmesg-fio_tests.log  
