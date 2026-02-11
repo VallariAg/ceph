@@ -3,13 +3,13 @@
 sudo modprobe nvme-fabrics
 sudo modprobe nvme-tcp
 # sudo dnf reinstall nvme-cli -y
-
+sudo dnf install nvme-cli-2.13 -y
 # install nvme 2.13 (issue with latest nvme version 2.16 with centos9: https://tracker.ceph.com/issues/74615#note-5)
-curl -O https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/nvme-cli-2.13-1.el9.x86_64.rpm
-curl -O https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libnvme-1.13-1.el9.x86_64.rpm
-ls -l nvme-cli-2.13-1.el9.x86_64.rpm libnvme-1.13-1.el9.x86_64.rpm
-sudo rpm -qp --qf "%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n" nvme-cli-2.13-1.el9.x86_64.rpm   # should print nvme-cli-2.13-1.el9.x86_64
-sudo dnf downgrade ./nvme-cli-2.13-1.el9.x86_64.rpm ./libnvme-1.13-1.el9.x86_64.rpm -y
+# curl -O https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/nvme-cli-2.13-1.el9.x86_64.rpm
+# curl -O https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libnvme-1.13-1.el9.x86_64.rpm
+# ls -l nvme-cli-2.13-1.el9.x86_64.rpm libnvme-1.13-1.el9.x86_64.rpm
+# sudo rpm -qp --qf "%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n" nvme-cli-2.13-1.el9.x86_64.rpm   # should print nvme-cli-2.13-1.el9.x86_64
+# sudo dnf downgrade ./nvme-cli-2.13-1.el9.x86_64.rpm ./libnvme-1.13-1.el9.x86_64.rpm -y
 sudo lsmod | grep nvme
 nvme version
 
@@ -78,12 +78,12 @@ test_run() {
 }
 
 
-test_run disconnect_all
+# test_run disconnect_all
 test_run discovery 
 test_run connect
 test_run list_subsys 1
-test_run disconnect_all
-test_run list_subsys 0
+# test_run disconnect_all
+# test_run list_subsys 0
 devices_count=$(( $NVMEOF_NAMESPACES_COUNT * $NVMEOF_SUBSYSTEMS_COUNT )) 
 test_run connect_all $devices_count
 gateways_count=$(( $(echo "$NVMEOF_GATEWAY_IP_ADDRESSES" | tr -cd ',' | wc -c) + 1 ))

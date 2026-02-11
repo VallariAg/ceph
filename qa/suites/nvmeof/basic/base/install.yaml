@@ -12,3 +12,6 @@ tasks:
     - ceph orch host ls
     - ceph orch device ls
     - ceph osd lspools
+# - pexec:
+#     all:
+#     - sudo dnf upgrade json-c -y
