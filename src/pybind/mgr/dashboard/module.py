@@ -579,7 +579,8 @@ class Module(MgrModule, CherryPyConfig):
                 self.nvmeof_collectors.pop(_id, None)
 
         if NvmeofTopCollector is None:
-            raise RuntimeError("NVMeoF client library is not available")
+            logger.error("NVMeoFClient is not available")
+            return None
 
         _expire_old_sessions()
 

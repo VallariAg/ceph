@@ -20,7 +20,7 @@ try:
     from .nvmeof_cli import NvmeofGatewaysConfig
     from .nvmeof_conf import get_pool_group_name
 except ImportError as e:
-    logger.error("Failed to import NVMeoFClient and related components: %s", e)
+    logger.error(f"Failed to import NVMeoFClient and related components: {e}")
 else:
     def get_collector(session_id: str):
         MAX_SESSION_TTL = 60 * 60
@@ -130,7 +130,7 @@ else:
             self.busy_rate = self.busy_secs.rate(delay)
             self.idle_rate = self.idle_secs.rate(delay)
 
-    class NvmeofTopCollector:  # type: ignore
+    class NvmeofTopCollector:  # noqa  # pylint: disable=function-redefined
         def __init__(self):
             self.tool = None
             self.subsystem_nqn = ''
@@ -173,7 +173,8 @@ else:
             for subsys in self.subsystems.subsystems:
                 if subsys.nqn == self.subsystem_nqn:
                     return subsys.max_namespaces
-            logger.error("Request for max namespaces could not find a match against the NQN! Returning 0")
+            logger.error("Request for max namespaces could not find a "
+                         "match against the NQN! Returning 0")
             return 0
 
         @property
@@ -192,11 +193,14 @@ else:
                     else self.client.daemon_name
                 )
                 if daemon_name is None:
-                    logger.warning(f"No gateway found for load balancing group {ns.load_balancing_group}, skipping namespace {ns.nsid}")
+                    logger.warning(f"No gateway found for load balancing group "
+                                   f"{ns.load_balancing_group}, "
+                                   f"skipping namespace {ns.nsid}")
                     continue
                 perf_stats = self.iostats.get(daemon_name, {}).get(bdev_name)
                 if perf_stats is None:
-                    logger.warning(f"No iostats for bdev {bdev_name} on {daemon_name}, skipping namespace {ns.nsid}")
+                    logger.warning(f"No iostats for bdev {bdev_name} on "
+                                   f"{daemon_name}, skipping namespace {ns.nsid}")
                     continue
                 perf_stats.calculate(self.delay)
 
@@ -248,7 +252,8 @@ else:
             ]
 
         def qos_enabled(self, ns) -> str:
-            if (ns.rw_ios_per_second or ns.rw_mbytes_per_second or ns.r_mbytes_per_second or ns.w_mbytes_per_second):
+            if (ns.rw_ios_per_second or ns.rw_mbytes_per_second
+                    or ns.r_mbytes_per_second or ns.w_mbytes_per_second):
                 return 'Yes'
             return 'No'
 
@@ -303,7 +308,9 @@ else:
                 ns_stats.write_secs.update((ns.write_latency_ticks / stats.tick_rate))
 
         def _fetch_namespaces(self, subsystem_nqn):
-            return self._call_grpc('list_namespaces', NVMeoFClient.pb2.list_namespaces_req(subsystem=subsystem_nqn))
+            return self._call_grpc(
+                'list_namespaces',
+                NVMeoFClient.pb2.list_namespaces_req(subsystem=subsystem_nqn))
 
         def _fetch_thread_stats(self, client):
             gateway_addr = client.gateway_addr
@@ -325,7 +332,9 @@ else:
                 thread_stats.idle_secs.update(thread.idle / tick_rate)
 
         def _fetch_gateway_info(self, client):
-            return self._call_grpc('get_gateway_info', NVMeoFClient.pb2.get_gateway_info_req(), client)
+            return self._call_grpc(
+                'get_gateway_info',
+                NVMeoFClient.pb2.get_gateway_info_req(), client)
 
         def _fetch_subsystems(self):
             return self._call_grpc('list_subsystems', NVMeoFClient.pb2.list_subsystems_req())
@@ -344,8 +353,12 @@ else:
 
             self.gw_info = self._fetch_gateway_info(self.client)
             if not self.ready:
-                logger.error(f"Call to {self.server_addr} failed, RC={self.health.rc}, MSG={self.health.msg}")
-                self.health.msg = f"Unable to connect to {self.server_addr}, pass an available gateway as --server-addr"
+                logger.error(f"Call to {self.server_addr} failed, "
+                             f"RC={self.health.rc}, MSG={self.health.msg}")
+                self.health.msg = (
+                    f"Unable to connect to {self.server_addr}, "
+                    "pass an available gateway as --server-addr"
+                )
                 return
 
             logger.debug(f"Connected to {self.server_addr}")
@@ -395,7 +408,8 @@ else:
                 return
 
             self.namespaces[self.subsystem_nqn] = namespace_info.namespaces
-            logger.debug(f"Subsystem '{self.subsystem_nqn}' has {self.total_namespaces_defined} namespaces")
+            logger.debug(f"Subsystem '{self.subsystem_nqn}' has "
+                         f"{self.total_namespaces_defined} namespaces")
 
             group = self.tool.args.get('group', '')
             if not self.tool.args.get('server_addr'):
@@ -409,7 +423,10 @@ else:
                 self.lbg_to_gateway = get_lbg_gws_map(service_name)
                 if not self.lbg_to_gateway:
                     self.health.rc = errno.ENODATA
-                    self.health.msg = f'Failed to retrieve load balancing group mapping for service {service_name}'
+                    self.health.msg = (
+                        f'Failed to retrieve load balancing group '
+                        f'mapping for service {service_name}'
+                    )
                     return
                 for gw in gateways[service_name]:
                     client = NVMeoFClient(group, gw["service_url"])
@@ -431,7 +448,9 @@ else:
             try:
                 self.collector.initialize(self)
                 if not self.collector.ready:
-                    return (self.collector.health.rc, f"nvmeof-top has encountered an error: {self.collector.health.msg}")
+                    return (self.collector.health.rc,
+                            f"nvmeof-top has encountered an error: "
+                            f"{self.collector.health.msg}")
 
                 collect_start = time.time()
                 self._collect()
@@ -466,13 +485,17 @@ else:
 
         def format_output(self):
             if self.sort_key not in NVMeoFTopCPU.reactors_headers:
-                raise ValueError(f"Invalid sort key '{self.sort_key}'. Valid options: {NVMeoFTopCPU.reactors_headers}")
+                raise ValueError(
+                    f"Invalid sort key '{self.sort_key}'. "
+                    f"Valid options: {NVMeoFTopCPU.reactors_headers}"
+                )
             sort_pos = NVMeoFTopCPU.reactors_headers.index(self.sort_key)
             reactor_data = self.collector.get_reactor_data(sort_pos=sort_pos,
                                                            reverse_sort=self.reverse_sort)
             rows = []
             if self.args.get('with_timestamp'):
-                timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.collector.timestamp))
+                timestamp = time.strftime('%Y-%m-%d %H:%M:%S',
+                                          time.localtime(self.collector.timestamp))
                 rows.append(f"{timestamp} (delay: {self.collector.delay:.2f}s)\n")
 
             if not self.args.get('no_header'):
@@ -485,10 +508,17 @@ else:
 
     class NVMeoFTopIO(NVMeoFTopTool):
         subsystem_summary_headers = ['Subsystem', 'Namespaces']
-        summary_headers = ['Gateway', 'Load Balancing Group', 'Total Subsystems', 'Total Namespaces']
+        summary_headers = ['Gateway', 'Load Balancing Group',
+                           'Total Subsystems', 'Total Namespaces']
 
-        ns_headers = ['NSID', 'RBD Image', 'IOPS', 'r/s', 'rMB/s', 'r_await', 'rareq-sz', 'w/s', 'wMB/s', 'w_await', 'wareq-sz', 'LBGrp', 'QoS']
-        ns_template = "{:>4}   {:<40}   {:>7}   {:>6}   {:>6}   {:>7}   {:>8}   {:>6}   {:>6}   {:>7}   {:>8}   {:^5}   {:>3}\n"
+        ns_headers = [
+            'NSID', 'RBD Image', 'IOPS', 'r/s', 'rMB/s', 'r_await', 'rareq-sz',
+            'w/s', 'wMB/s', 'w_await', 'wareq-sz', 'LBGrp', 'QoS'
+        ]
+        ns_template = (
+            "{:>4}   {:<40}   {:>7}   {:>6}   {:>6}   {:>7}   {:>8}"
+            "   {:>6}   {:>6}   {:>7}   {:>8}   {:^5}   {:>3}\n"
+        )
 
         def __init__(self, args: dict, data_collector):
             super().__init__(args, data_collector)
@@ -499,7 +529,10 @@ else:
 
         def format_output(self):
             if self.sort_key not in NVMeoFTopIO.ns_headers:
-                raise ValueError(f"Invalid sort key '{self.sort_key}'. Valid options: {NVMeoFTopIO.ns_headers}")
+                raise ValueError(
+                    f"Invalid sort key '{self.sort_key}'. "
+                    f"Valid options: {NVMeoFTopIO.ns_headers}"
+                )
             sort_pos = NVMeoFTopIO.ns_headers.index(self.sort_key)
             ns_data = self.collector.get_sorted_namespaces(sort_pos=sort_pos,
                                                            reverse_sort=self.reverse_sort)
@@ -508,7 +541,8 @@ else:
 
             rows = []
             if self.args.get('with_timestamp'):
-                timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.collector.timestamp))
+                timestamp = time.strftime('%Y-%m-%d %H:%M:%S',
+                                          time.localtime(self.collector.timestamp))
                 rows.append(f"{timestamp} (delay: {self.collector.delay:.2f}s)\n")
             if self.args.get('summary'):
                 if self.args.get('server_addr'):
@@ -532,11 +566,11 @@ else:
 
     @DBCLICommand.Read('nvmeof top cpu', poll=True)
     def nvmeof_top_cpu(_, service: str = '',
-                    server_addr: str = '', group: str = '',
-                    descending: bool = False, sort_by: str = 'Thread Name',
-                    with_timestamp: bool = False,
-                    no_header: bool = False,
-                    session_id: str = None):
+                       server_addr: str = '', group: str = '',
+                       descending: bool = False, sort_by: str = 'Thread Name',
+                       with_timestamp: bool = False,
+                       no_header: bool = False,
+                       session_id: str = None):
         '''
         NVMeoF Top CPU Tool
         --period [-p] <delay> (default 1s, max 3600s)
@@ -570,11 +604,11 @@ else:
 
     @DBCLICommand.Read('nvmeof top io', poll=True)
     def nvmeof_top_io(_, subsystem: str = '',
-                    server_addr: str = '', group: str = '',
-                    descending: bool = False, sort_by: str = 'NSID',
-                    with_timestamp: bool = False,
-                    summary: bool = False, no_header: bool = False,
-                    session_id: str = None):
+                      server_addr: str = '', group: str = '',
+                      descending: bool = False, sort_by: str = 'NSID',
+                      with_timestamp: bool = False,
+                      summary: bool = False, no_header: bool = False,
+                      session_id: str = None):
         '''
         NVMeoF Top IO Tool
         --period [-p] <delay> (default 1s, max 3600s)
@@ -598,7 +632,10 @@ else:
             'group': group,
         }
         if not subsystem:
-            return HandleCommandResult(stderr="Required argument '--subsystem' missing", retval=-errno.EINVAL)
+            return HandleCommandResult(
+                stderr="Required argument '--subsystem' missing",
+                retval=-errno.EINVAL
+            )
         try:
             data_collector = get_collector(session_id)
             top_tool = NVMeoFTopIO(args, data_collector)
