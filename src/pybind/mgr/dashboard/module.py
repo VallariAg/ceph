@@ -559,6 +559,8 @@ class Module(MgrModule, CherryPyConfig):
         return self.__pool_stats
     
     def get_nvmeof_collector(self, session_id: str = '', ttl: int = 3600):
+        STALE_POLL_THRESHOLD = 5 # expire if 5 poll intervals have passed without activity
+
         def _expire_old_sessions():
             now = time.time()
             expired = []
@@ -566,10 +568,10 @@ class Module(MgrModule, CherryPyConfig):
             for _id in list(self.nvmeof_collectors.keys()):
                 collector = self.nvmeof_collectors[_id]
                 delay = collector.delay
-                if delay < 1:
+                if delay < 1: # for first pool iteration
                     expire_time = collector.timestamp + ttl
                 else:
-                    expire_time = collector.timestamp + (5 * collector.delay)
+                    expire_time = collector.timestamp + (STALE_POLL_THRESHOLD * delay)
                 if now > expire_time:
                     expired.append(_id)
 
