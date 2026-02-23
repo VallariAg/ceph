@@ -2,11 +2,11 @@
 # This file is moved from the original work of "nvmeof-top" tool in:
 # https://github.com/pcuzner/ceph-nvmeof-top 
 # by Paul Cuzner <pcuzner@ibm.com>
-import threading
+# import threading
 import time
 import logging
 import grpc
-import asyncio
+# import asyncio
 import json
 
 from .. import mgr
@@ -74,9 +74,10 @@ class NVMeoFTopTool:
             status_code = self.collector.health.rc
             return (status_code, f"nvmeof-top has encountered an error: {self.collector.health.msg}")
 
-        t = threading.Thread(target=self._run, daemon=True)
-        t.start()
-        t.join()
+        # t = threading.Thread(target=self._run, daemon=True)
+        # t.start()
+        # t.join()
+        self._run()
 
         if not self.collector.ready:
             status_code = self.collector.health.rc
@@ -108,7 +109,7 @@ class NVMeoFTopCPU(NVMeoFTopTool):
 
     def _run(self):
         if self.collector.ready:
-            asyncio.run(self.collector.collect_cpu_data())
+            self.collector.collect_cpu_data()
 
     def to_stdout(self):
         sort_pos = NVMeoFTopCPU.reactors_headers.index(self.sort_key)
@@ -141,7 +142,7 @@ class NVMeoFTopIO(NVMeoFTopTool):
 
     def _run(self):
         if self.collector.ready:
-            asyncio.run(self.collector.collect_io_data())
+            self.collector.collect_io_data()
 
     def to_stdout(self):
         sort_pos = NVMeoFTopIO.ns_headers.index(self.sort_key)
@@ -155,10 +156,11 @@ class NVMeoFTopIO(NVMeoFTopTool):
             tstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.collector.timestamp))
             rows.append(f"{tstamp} (delay: {self.collector.delay})\n")
         if self.args.get('summary'):
-            summary_row = ""
-            for index, header in enumerate(NVMeoFTopIO.summary_headers):
-                summary_row += f"{header}: {overall_summary_data[index]}  "
-            rows.append(summary_row + "\n")
+            if self.args.get('server_addr'):
+                summary_row = ""
+                for index, header in enumerate(NVMeoFTopIO.summary_headers):
+                    summary_row += f"{header}: {overall_summary_data[index]}  "
+                rows.append(summary_row + "\n")
             subsys_summary_row = ""
             for index, header in enumerate(NVMeoFTopIO.subsystem_summary_headers):
                 subsys_summary_row += f"{header}: {subsystem_summary_data[index]}  "
@@ -351,7 +353,7 @@ class NvmeofTopCollector:
         self.subsystems = None
         self.reactor_stats = {}
         self.iostats = {}
-        self.iostats_lock = threading.Lock()
+        # self.iostats_lock = threading.Lock()
         self.gw_info = None
         self.timestamp = time.time()
         self.health = Health()
@@ -510,57 +512,54 @@ class NvmeofTopCollector:
         daemon_name = client.daemon_name
         
         logger.info(f"fetching iostats for namespaces from {daemon_name}")
-        with self.iostats_lock:
-            logger.info('iostats lock acquired')
-            # if ns.bdev_name not in self.iostats:
-            #     self.iostats[ns.bdev_name] = PerformanceStats(ns.bdev_name, self.delay)
-            logger.info('calling list_namespaces_io_stats')
-            stats = self.call_grpc_api('list_namespaces_io_stats',
-                                       NVMeoFClient.pb2.list_namespaces_io_stats_req())
-            if daemon_name not in self.iostats:
-                self.iostats[daemon_name] = {}
+        # with self.iostats_lock:
+        logger.info('iostats lock acquired')
+        # if ns.bdev_name not in self.iostats:
+        #     self.iostats[ns.bdev_name] = PerformanceStats(ns.bdev_name, self.delay)
+        logger.info('calling list_namespaces_io_stats')
+        stats = self.call_grpc_api('list_namespaces_io_stats',
+                                    NVMeoFClient.pb2.list_namespaces_io_stats_req(), client)
+        if daemon_name not in self.iostats:
+            self.iostats[daemon_name] = {}
+        
+        logger.info(stats)
+
+        for ns in stats.namespaces:
+            bdev_name = ns.bdev_name
+            logger.info(f"VALLARI_DEBUG_SHOW {bdev_name}: {ns}")
+            if bdev_name not in self.iostats[daemon_name]:
+                logger.info(f"VALLARI_DEBUG_SHOW: add PerformanceStats")
+                self.iostats[daemon_name][bdev_name] = PerformanceStats(bdev_name, self.delay)
             
-            logger.info(stats)
-
-            for ns in stats.namespaces:
-                bdev_name = ns.bdev_name
-                logger.info(f"VALLARI_DEBUG_SHOW {bdev_name}: {ns}")
-                if bdev_name not in self.iostats[daemon_name]:
-                    logger.info(f"VALLARI_DEBUG_SHOW: add PerformanceStats")
-                    self.iostats[daemon_name][bdev_name] = PerformanceStats(bdev_name, self.delay)                
-
-                ns = dict(ns)
-                logger.info(f"VALLARI_DEBUG_SHOW: {ns=}")
-                
-                iostats = self.iostats[daemon_name][bdev_name]
-                iostats.read_ops.update(ns.get('num_read_ops', 0))
-                iostats.read_bytes.update(ns.get('bytes_read', 0))
-                iostats.read_secs.update((ns.get('read_latency_ticks', 0) / stats.tick_rate))
-                iostats.write_ops.update(ns.get('num_write_ops', 0))
-                iostats.write_bytes.update(ns.get('bytes_written', 0))
-                iostats.write_secs.update((ns.get('write_latency_ticks', 0) / stats.tick_rate))
-            logger.info(f"VALLARI_DEBUG_SHOW: {self.iostats}")
+            iostats = self.iostats[daemon_name][bdev_name]
+            iostats.read_ops.update(ns.num_read_ops)
+            iostats.read_bytes.update(ns.bytes_read)
+            iostats.read_secs.update((ns.read_latency_ticks / stats.tick_rate))
+            iostats.write_ops.update(ns.num_write_ops)
+            iostats.write_bytes.update(ns.bytes_written)
+            iostats.write_secs.update((ns.write_latency_ticks / stats.tick_rate))
+        logger.info(f"VALLARI_DEBUG_SHOW: {self.iostats}")
 
     def _get_ns_iostats(self, ns):
         logger.debug(f"fetching iostats for namespace {ns.nsid}")
-        with self.iostats_lock:
-            logger.debug('iostats lock acquired')
-            if ns.bdev_name not in self.iostats:
-                self.iostats[ns.bdev_name] = PerformanceStats(ns.bdev_name, self.delay)
-            logger.debug('calling namespace_get_io_stats')
-            stats = self.call_grpc_api('namespace_get_io_stats',
-                                       NVMeoFClient.pb2.namespace_get_io_stats_req(
-                                           subsystem_nqn=self.subsystem_nqn,
-                                           nsid=ns.nsid))
-            logger.debug(stats)
+        # with self.iostats_lock:
+        logger.debug('iostats lock acquired')
+        if ns.bdev_name not in self.iostats:
+            self.iostats[ns.bdev_name] = PerformanceStats(ns.bdev_name, self.delay)
+        logger.debug('calling namespace_get_io_stats')
+        stats = self.call_grpc_api('namespace_get_io_stats',
+                                    NVMeoFClient.pb2.namespace_get_io_stats_req(
+                                        subsystem_nqn=self.subsystem_nqn,
+                                        nsid=ns.nsid))
+        logger.debug(stats)
 
-            iostats = self.iostats[ns.bdev_name]
-            iostats.read_ops.update(stats.num_read_ops)
-            iostats.read_bytes.update(stats.bytes_read)
-            iostats.read_secs.update((stats.read_latency_ticks / stats.tick_rate))
-            iostats.write_ops.update(stats.num_write_ops)
-            iostats.write_bytes.update(stats.bytes_written)
-            iostats.write_secs.update((stats.write_latency_ticks / stats.tick_rate))
+        iostats = self.iostats[ns.bdev_name]
+        iostats.read_ops.update(stats.num_read_ops)
+        iostats.read_bytes.update(stats.bytes_read)
+        iostats.read_secs.update((stats.read_latency_ticks / stats.tick_rate))
+        iostats.write_ops.update(stats.num_write_ops)
+        iostats.write_bytes.update(stats.bytes_written)
+        iostats.write_secs.update((stats.write_latency_ticks / stats.tick_rate))
 
     def _get_namespaces(self, subsystem_nqn):
         return self.call_grpc_api('list_namespaces', NVMeoFClient.pb2.list_namespaces_req(subsystem=subsystem_nqn))
@@ -568,23 +567,23 @@ class NvmeofTopCollector:
     def _get_threads_stats(self, client):
         gateway_addr = client.gateway_addr
         logger.debug(f"fetching iostats for {gateway_addr}")
-        with self.iostats_lock:
-            logger.debug('calling get_thread_stats')
-            stats = self.call_grpc_api('get_thread_stats', 
-                                       NVMeoFClient.pb2.get_thread_stats_req(), client)
-            logger.debug(f'calling get_thread_stats {stats=}')
-            
-            if gateway_addr not in self.reactor_stats:
-                self.reactor_stats[gateway_addr] = {}
-            tick_rate = stats.tick_rate
-            for thread in stats.threads:
-                name = thread.name
-                if name not in self.reactor_stats[gateway_addr]:
-                    self.reactor_stats[gateway_addr][name] = ReactorStats(thread.name)
-                reactor_data = self.reactor_stats[gateway_addr][name]
-                reactor_data.busy_secs.update(thread.busy / tick_rate)
-                reactor_data.idle_secs.update(thread.idle / tick_rate)
-                reactor_data.tick_rate.update(tick_rate)
+        # with self.iostats_lock:
+        logger.debug('calling get_thread_stats')
+        stats = self.call_grpc_api('get_thread_stats', 
+                                    NVMeoFClient.pb2.get_thread_stats_req(), client)
+        logger.debug(f'calling get_thread_stats {stats=}')
+        
+        if gateway_addr not in self.reactor_stats:
+            self.reactor_stats[gateway_addr] = {}
+        tick_rate = stats.tick_rate
+        for thread in stats.threads:
+            name = thread.name
+            if name not in self.reactor_stats[gateway_addr]:
+                self.reactor_stats[gateway_addr][name] = ReactorStats(thread.name)
+            reactor_data = self.reactor_stats[gateway_addr][name]
+            reactor_data.busy_secs.update(thread.busy / tick_rate)
+            reactor_data.idle_secs.update(thread.idle / tick_rate)
+            reactor_data.tick_rate.update(tick_rate)
 
     def _get_subsystems(self):
         return self.call_grpc_api('list_subsystems', NVMeoFClient.pb2.list_subsystems_req(subsystem_nqn=self.subsystem_nqn))
@@ -614,7 +613,7 @@ class NvmeofTopCollector:
 
         self.log_connection()
 
-    async def collect_cpu_data(self):
+    def collect_cpu_data(self):
         tasks = []
         service_name = self.cmd_handler.gws_service
         group = self.cmd_handler.group
@@ -626,15 +625,15 @@ class NvmeofTopCollector:
                 return
             for gw in gw_conf["gateways"][service_name]:
                 client = NVMeoFClient(group, gw["service_url"])
-                r = asyncio.create_task(asyncio.to_thread(self._get_threads_stats, client))
-                tasks.append(r)
+                self._get_threads_stats(client)
+                # tasks.append(r)
         else:
-            r = asyncio.create_task(asyncio.to_thread(self._get_threads_stats, self.client))
-            tasks.append(r)
-        await asyncio.gather(*tasks)
+            self._get_threads_stats(self.client)
+            # tasks.append(r)
+        # await asyncio.gather(*tasks)
         logger.debug("collect_cpu_data tasks completed")
 
-    async def collect_io_data(self):
+    def collect_io_data(self):
         self.subsystem_nqn = self.cmd_handler.subsystem_nqn
 
         self.subsystems = self._get_all_subsystems()
@@ -678,16 +677,16 @@ class NvmeofTopCollector:
                 self.health.rc = 8
                 self.health.msg = f'Service {service_name} not found'
                 return
+            self.lbg_gw = get_lbg_gws_map(service_name)
             for gw in gw_conf["gateways"][service_name]:
                 client = NVMeoFClient(group, gw["service_url"])
-                self.lbg_gw = get_lbg_gws_map(service_name)
                 logger.info(f"VALLARI_DEBUG: {self.lbg_gw}")
-                r = asyncio.create_task(asyncio.to_thread(self._get_namespaces_iostat, client))
-                tasks.append(r)
+                self._get_namespaces_iostat(client)
+                # tasks.append(r)
         else:
-            r = asyncio.create_task(asyncio.to_thread(self._get_namespaces_iostat, self.client))
-            tasks.append(r)
+            self._get_namespaces_iostat(self.client)
+            # tasks.append(r)
 
-        await asyncio.gather(*tasks)
+        # await asyncio.gather(*tasks)
         logger.debug("collect_io_data tasks completed")
 
