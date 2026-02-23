@@ -578,8 +578,11 @@ class Module(MgrModule, CherryPyConfig):
             for _id in expired:
                 self.nvmeof_collectors.pop(_id, None)
 
+        if NvmeofTopCollector is None:
+            raise RuntimeError("NVMeoF client library is not available")
+
         _expire_old_sessions()
-        
+
         if session_id not in self.nvmeof_collectors:
             self.nvmeof_collectors[session_id] = NvmeofTopCollector()
         return self.nvmeof_collectors[session_id]
