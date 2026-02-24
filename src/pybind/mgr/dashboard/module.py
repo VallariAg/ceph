@@ -557,9 +557,9 @@ class Module(MgrModule, CherryPyConfig):
                 self.__pool_stats[pool_id][stat_name].append((now, stat_val))
 
         return self.__pool_stats
-    
+
     def get_nvmeof_collector(self, session_id: str = '', ttl: int = 3600):
-        STALE_POLL_THRESHOLD = 5 # expire if 5 poll intervals have passed without activity
+        STALE_POLL_THRESHOLD = 5  # expire if 5 poll intervals have passed without activity
 
         def _expire_old_sessions():
             now = time.time()
@@ -568,7 +568,7 @@ class Module(MgrModule, CherryPyConfig):
             for _id in list(self.nvmeof_collectors.keys()):
                 collector = self.nvmeof_collectors[_id]
                 delay = collector.delay
-                if delay < 1: # for first pool iteration
+                if delay < 1:  # for first poll iteration
                     expire_time = collector.timestamp + ttl
                 else:
                     expire_time = collector.timestamp + (STALE_POLL_THRESHOLD * delay)
@@ -580,6 +580,9 @@ class Module(MgrModule, CherryPyConfig):
 
         if NvmeofTopCollector is None:
             logger.error("NVMeoFClient is not available")
+            return None
+
+        if not session_id:
             return None
 
         _expire_old_sessions()

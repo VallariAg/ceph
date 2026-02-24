@@ -5,15 +5,15 @@
 import errno
 import time
 import logging
-import grpc
 import json
+from typing import Any, Optional
 
 from .. import mgr
 from mgr_module import HandleCommandResult
 from ..cli import DBCLICommand
 logger = logging.getLogger(__name__)
 
-NvmeofTopCollector = None
+NvmeofTopCollector = None  # type: ignore[assignment]
 
 try:
     from .nvmeof_client import NVMeoFClient
@@ -22,7 +22,7 @@ try:
 except ImportError as e:
     logger.error(f"Failed to import NVMeoFClient and related components: {e}")
 else:
-    def get_collector(session_id: str):
+    def get_collector(session_id: Optional[str]):
         MAX_SESSION_TTL = 60 * 60
         return mgr.get_nvmeof_collector(session_id, MAX_SESSION_TTL)
 
@@ -94,7 +94,7 @@ else:
             self.r_await = 0.0
             self.w_await = 0.0
 
-        def calculate(self, delay: int):
+        def calculate(self, delay: float):
             self.read_ops_rate = self.read_ops.rate(delay)
             self.read_bytes_rate = self.read_bytes.rate(delay)
             self.read_secs_rate = self.read_secs.rate(delay)
@@ -126,22 +126,22 @@ else:
             self.busy_rate = 0.0
             self.idle_rate = 0.0
 
-        def calculate(self, delay: int):
+        def calculate(self, delay: float):
             self.busy_rate = self.busy_secs.rate(delay)
             self.idle_rate = self.idle_secs.rate(delay)
 
-    class NvmeofTopCollector:  # noqa  # pylint: disable=function-redefined
+    class NvmeofTopCollector:  # type: ignore[no-redef]  # noqa
         def __init__(self):
-            self.tool = None
+            self.tool: Any = None
             self.subsystem_nqn = ''
             self.server_addr = ''
-            self.delay = 0
+            self.delay: float = 0.0
             self.namespaces = {}
-            self.lbg_to_gateway = {}
-            self.subsystems = None
+            self.lbg_to_gateway: dict = {}
+            self.subsystems: Any = None
             self.reactor_stats = {}
             self.iostats = {}
-            self.gw_info = None
+            self.gw_info: Any = None
             self.timestamp = time.time()
             self.health = Health()
 
@@ -187,12 +187,15 @@ else:
             for ns in self.namespaces[self.subsystem_nqn]:
                 bdev_name = ns.bdev_name
 
-                daemon_name = (
-                    self.lbg_to_gateway.get(ns.load_balancing_group)
-                    if not self.tool.args.get('server_addr')
-                    else self.client.daemon_name
-                )
-                if daemon_name is None:
+                daemon_name = ""
+                if self.tool.args.get('server_addr'):
+                    # only show namespaces owned by this gateway's LBG
+                    if ns.load_balancing_group != self.load_balancing_group:
+                        continue
+                    daemon_name = self.client.daemon_name
+                else:
+                    daemon_name = self.lbg_to_gateway.get(ns.load_balancing_group, '')
+                if not daemon_name:
                     logger.warning(f"No gateway found for load balancing group "
                                    f"{ns.load_balancing_group}, "
                                    f"skipping namespace {ns.nsid}")
@@ -231,8 +234,8 @@ else:
                     reactor_data.append((
                         gw_addr,
                         thread_stats.thread,
-                        f"{thread_stats.busy_rate:.2f}",
-                        f"{thread_stats.idle_rate:.2f}",
+                        f"{thread_stats.busy_rate * 100:.2f}",
+                        f"{thread_stats.idle_rate * 100:.2f}",
                     ))
             reactor_data.sort(key=lambda t: t[sort_pos], reverse=reverse_sort)
             return reactor_data
@@ -273,7 +276,7 @@ else:
             try:
                 method = getattr(client.stub, method_name)
                 response = method(request)
-            except grpc._channel._InactiveRpcError:
+            except Exception:
                 self.health.rc = -errno.ECONNREFUSED
                 self.health.msg = f"RPC endpoint unavailable at {client.gateway_addr}"
                 logger.error(f"grpc call to {method_name} failed: {self.health.msg}")
@@ -339,7 +342,6 @@ else:
         def _fetch_subsystems(self):
             return self._call_grpc('list_subsystems', NVMeoFClient.pb2.list_subsystems_req())
 
-        # collector methods
         def initialize(self, tool):
             self.health = Health()
             self.tool = tool
@@ -440,7 +442,7 @@ else:
     class NVMeoFTopTool:
         def __init__(self, args: dict, data_collector):
             self.args = args
-            self.collector: NvmeofTopCollector = data_collector
+            self.collector = data_collector
             self.reverse_sort = args.get('sort_descending', False)
             self.sort_key = args.get('sort_by')
 
@@ -463,7 +465,7 @@ else:
                 output += "\n ---- "
                 return (0, output)
             except Exception as ex:
-                logger.exception(ex)
+                logger.exception(f"top tool failed to run: {ex}")
                 return (-errno.EINVAL, str(ex))
 
         def _collect(self):
@@ -473,7 +475,7 @@ else:
             raise NotImplementedError
 
     class NVMeoFTopCPU(NVMeoFTopTool):
-        reactors_headers = ['Gateway', 'Thread Name', 'Busy Rate', 'Idle Rate']
+        reactors_headers = ['Gateway', 'Thread Name', 'Busy Rate%', 'Idle Rate%']
         reactors_template = "{:<30}   {:<30}   {:<20}   {:<20}\n"
 
         def __init__(self, args: dict, data_collector):
@@ -570,7 +572,7 @@ else:
                        descending: bool = False, sort_by: str = 'Thread Name',
                        with_timestamp: bool = False,
                        no_header: bool = False,
-                       session_id: str = None):
+                       session_id: Optional[str] = None):
         '''
         NVMeoF Top CPU Tool
         --period [-p] <delay> (default 1s, max 3600s)
@@ -593,13 +595,18 @@ else:
         }
         try:
             data_collector = get_collector(session_id)
+            if data_collector is None:
+                return HandleCommandResult(
+                    stderr="Unable to initialize collector",
+                    retval=-errno.EINVAL
+                )
             top_tool = NVMeoFTopCPU(args, data_collector)
             rc, output = top_tool.run()
             if rc != 0:
                 return HandleCommandResult(stderr=output, retval=rc)
             return HandleCommandResult(stdout=output, retval=rc)
         except Exception as exc:
-            logger.exception(exc)
+            logger.exception(f"top-cpu command failed: {exc}")
             return HandleCommandResult(stderr=str(exc), retval=-errno.EINVAL)
 
     @DBCLICommand.Read('nvmeof top io', poll=True)
@@ -608,7 +615,7 @@ else:
                       descending: bool = False, sort_by: str = 'NSID',
                       with_timestamp: bool = False,
                       summary: bool = False, no_header: bool = False,
-                      session_id: str = None):
+                      session_id: Optional[str] = None):
         '''
         NVMeoF Top IO Tool
         --period [-p] <delay> (default 1s, max 3600s)
@@ -638,11 +645,16 @@ else:
             )
         try:
             data_collector = get_collector(session_id)
+            if data_collector is None:
+                return HandleCommandResult(
+                    stderr="Unable to initialize collector",
+                    retval=-errno.EINVAL
+                )
             top_tool = NVMeoFTopIO(args, data_collector)
             rc, output = top_tool.run()
             if rc != 0:
                 return HandleCommandResult(stderr=output, retval=rc)
             return HandleCommandResult(stdout=output, retval=rc)
         except Exception as exc:
-            logger.exception(exc)
+            logger.exception(f"top-io command failed: {exc}")
             return HandleCommandResult(stderr=str(exc), retval=-errno.EINVAL)

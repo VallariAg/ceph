@@ -217,6 +217,7 @@ def is_mtls_enabled(service_name: str):
     except OrchestratorError:
         return False
 
+
 def get_pool_group_name(service_name: str):
     try:
         orch = OrchClient.instance()

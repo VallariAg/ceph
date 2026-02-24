@@ -48,6 +48,7 @@ else:
                     f'Unable to retrieve the gateway info: {e}'
                 )
 
+            self.daemon_name = ''
             # While creating listener need to direct request to the gateway
             # address where listener is supposed to be added.
             if server_address:
