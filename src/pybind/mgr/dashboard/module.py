@@ -34,10 +34,10 @@ from .cli import DBCLICommand
 from .controllers import nvmeof  # noqa # pylint: disable=unused-import
 from .controllers import Router, json_error_page
 from .grafana import push_local_dashboards
-from .services.nvmeof_top_cli import NvmeofTopCollector
-from .services import nvmeof_cli, nvmeof_top_cli # noqa # pylint: disable=unused-import
+from .services import nvmeof_cli, nvmeof_top_cli  # noqa # pylint: disable=unused-import
 from .services.auth import AuthManager, AuthManagerTool, JwtManager
 from .services.exception import dashboard_exception_handler
+from .services.nvmeof_top_cli import NvmeofTopCollector
 from .services.service import RgwServiceManager
 from .services.sso import SSO_COMMANDS, handle_sso_command
 from .settings import handle_option_command, options_command_list, options_schema_list

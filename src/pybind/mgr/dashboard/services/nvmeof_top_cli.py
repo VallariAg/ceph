@@ -3,24 +3,26 @@
 # https://github.com/pcuzner/ceph-nvmeof-top
 # by Paul Cuzner <pcuzner@ibm.com>
 import errno
-import time
-import logging
 import json
+import logging
+import time
 from typing import Any, Optional
 
-from .. import mgr
 from mgr_module import HandleCommandResult
+
+from .. import mgr
 from ..cli import DBCLICommand
+
 logger = logging.getLogger(__name__)
 
 NvmeofTopCollector = None
 
 try:
-    from .nvmeof_client import NVMeoFClient
     from .nvmeof_cli import NvmeofGatewaysConfig
+    from .nvmeof_client import NVMeoFClient
     from .nvmeof_conf import get_pool_group_name
 except ImportError as e:
-    logger.error(f"Failed to import NVMeoFClient and related components: {e}")
+    logger.error("Failed to import NVMeoFClient and related components: %s", e)
 else:
     def get_collector(session_id: Optional[str]):
         MAX_SESSION_TTL = 60 * 60
@@ -49,7 +51,7 @@ else:
                     lbg_gws_map[gw_lbg] = gw_id
                 return lbg_gws_map
             return {}
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             logger.exception('Failed to get nvme-gw show command')
             return {}
 
@@ -74,7 +76,7 @@ else:
                 return 0.0
             return (self.current - self.last) / interval
 
-    class PerformanceStats:
+    class PerformanceStats:  # pylint: disable=too-many-instance-attributes
         def __init__(self, bdev: str):
             self.bdev = bdev
             self.read_ops = Counter()
@@ -88,6 +90,8 @@ else:
             self.write_ops_rate = 0
             self.read_bytes_rate = 0
             self.write_bytes_rate = 0
+            self.read_secs_rate = 0.0
+            self.write_secs_rate = 0.0
             self.total_ops_rate = 0
             self.rareq_sz = 0.0
             self.wareq_sz = 0.0
@@ -130,7 +134,7 @@ else:
             self.busy_rate = self.busy_secs.rate(delay)
             self.idle_rate = self.idle_secs.rate(delay)
 
-    class NvmeofTopCollector:  # type: ignore[no-redef]  # noqa
+    class NvmeofTopCollector:  # type: ignore[no-redef]  # noqa  # pylint: disable=function-redefined,too-many-instance-attributes
         def __init__(self):
             self.tool: Any = None
             self.subsystem_nqn = ''
@@ -142,6 +146,7 @@ else:
             self.reactor_stats = {}
             self.iostats = {}
             self.gw_info: Any = None
+            self.client: Any = None
             self.timestamp = time.time()
             self.health = Health()
 
@@ -196,14 +201,14 @@ else:
                 else:
                     daemon_name = self.lbg_to_gateway.get(ns.load_balancing_group, '')
                 if not daemon_name:
-                    logger.warning(f"No gateway found for load balancing group "
-                                   f"{ns.load_balancing_group}, "
-                                   f"skipping namespace {ns.nsid}")
+                    logger.warning("No gateway found for load balancing group %s, "
+                                   "skipping namespace %s",
+                                   ns.load_balancing_group, ns.nsid)
                     continue
                 perf_stats = self.iostats.get(daemon_name, {}).get(bdev_name)
                 if perf_stats is None:
-                    logger.warning(f"No iostats for bdev {bdev_name} on "
-                                   f"{daemon_name}, skipping namespace {ns.nsid}")
+                    logger.warning("No iostats for bdev %s on %s, skipping namespace %s",
+                                   bdev_name, daemon_name, ns.nsid)
                     continue
                 perf_stats.calculate(self.delay)
 
@@ -270,28 +275,28 @@ else:
 
         # grpc methods
         def _call_grpc(self, method_name, request, client=None):
-            logger.debug(f"calling grpc method {method_name}")
+            logger.debug("calling grpc method %s", method_name)
             if not client:
                 client = self.client
             try:
                 method = getattr(client.stub, method_name)
                 response = method(request)
-            except Exception:
+            except Exception as exc:  # pylint: disable=broad-except
                 self.health.rc = -errno.ECONNREFUSED
                 self.health.msg = f"RPC endpoint unavailable at {client.gateway_addr}"
-                logger.error(f"grpc call to {method_name} failed: {self.health.msg}")
+                logger.error("grpc call to %s failed: %s (%s)", method_name, self.health.msg, exc)
                 return None
 
             self.health.msg = f"{method_name} success"
-            logger.debug(f"call to {method_name} successful")
+            logger.debug("call to %s successful", method_name)
             return response
 
         def _fetch_namespace_iostats(self, client):
             daemon_name = client.daemon_name
-            logger.debug(f"fetching iostats for namespaces from {daemon_name}")
+            logger.debug("fetching iostats for namespaces from %s", daemon_name)
             stats = self._call_grpc('list_namespaces_io_stats',
                                     NVMeoFClient.pb2.list_namespaces_io_stats_req(), client)
-            logger.debug(f'list_namespaces_io_stats {stats=}')
+            logger.debug("list_namespaces_io_stats stats=%s", stats)
             if stats is None:
                 return
             if daemon_name not in self.iostats:
@@ -317,10 +322,10 @@ else:
 
         def _fetch_thread_stats(self, client):
             gateway_addr = client.gateway_addr
-            logger.debug(f"fetching thread stats for {gateway_addr}")
+            logger.debug("fetching thread stats for %s", gateway_addr)
             stats = self._call_grpc('get_thread_stats',
                                     NVMeoFClient.pb2.get_thread_stats_req(), client)
-            logger.debug(f'get_thread_stats {stats=}')
+            logger.debug("get_thread_stats stats=%s", stats)
             if stats is None:
                 return
             if gateway_addr not in self.reactor_stats:
@@ -355,15 +360,15 @@ else:
 
             self.gw_info = self._fetch_gateway_info(self.client)
             if not self.ready:
-                logger.error(f"Call to {self.server_addr} failed, "
-                             f"RC={self.health.rc}, MSG={self.health.msg}")
+                logger.error("Call to %s failed, RC=%s, MSG=%s",
+                             self.server_addr, self.health.rc, self.health.msg)
                 self.health.msg = (
                     f"Unable to connect to {self.server_addr}, "
                     "pass an available gateway as --server-addr"
                 )
                 return
 
-            logger.debug(f"Connected to {self.server_addr}")
+            logger.debug("Connected to %s", self.server_addr)
 
         def collect_cpu_data(self):
             service_name = self.tool.service_name
@@ -384,7 +389,7 @@ else:
                 self._fetch_thread_stats(self.client)
             logger.debug("collect_cpu_data completed")
 
-        def collect_io_data(self):
+        def collect_io_data(self):  # pylint: disable=too-many-return-statements
             self.subsystem_nqn = self.tool.subsystem_nqn
 
             self.subsystems = self._fetch_subsystems()
@@ -410,8 +415,8 @@ else:
                 return
 
             self.namespaces[self.subsystem_nqn] = namespace_info.namespaces
-            logger.debug(f"Subsystem '{self.subsystem_nqn}' has "
-                         f"{self.total_namespaces_defined} namespaces")
+            logger.debug("Subsystem '%s' has %s namespaces",
+                         self.subsystem_nqn, self.total_namespaces_defined)
 
             group = self.tool.args.get('group', '')
             if not self.tool.args.get('server_addr'):
@@ -456,7 +461,7 @@ else:
 
                 collect_start = time.time()
                 self._collect()
-                logger.info(f"collector methods took {time.time() - collect_start:.2f}s")
+                logger.info("collector methods took %.2fs", time.time() - collect_start)
 
                 if not self.collector.ready:
                     return (self.collector.health.rc, self.collector.health.msg)
@@ -464,8 +469,8 @@ else:
                 output = self.format_output()
                 output += "\n ---- "
                 return (0, output)
-            except Exception as ex:
-                logger.exception(f"top tool failed to run: {ex}")
+            except Exception as ex:  # pylint: disable=broad-except
+                logger.exception("top tool failed to run: %s", ex)
                 return (-errno.EINVAL, str(ex))
 
         def _collect(self):
@@ -605,8 +610,8 @@ else:
             if rc != 0:
                 return HandleCommandResult(stderr=output, retval=rc)
             return HandleCommandResult(stdout=output, retval=rc)
-        except Exception as exc:
-            logger.exception(f"top-cpu command failed: {exc}")
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception("top-cpu command failed: %s", exc)
             return HandleCommandResult(stderr=str(exc), retval=-errno.EINVAL)
 
     @DBCLICommand.Read('nvmeof top io', poll=True)
@@ -655,6 +660,6 @@ else:
             if rc != 0:
                 return HandleCommandResult(stderr=output, retval=rc)
             return HandleCommandResult(stdout=output, retval=rc)
-        except Exception as exc:
-            logger.exception(f"top-io command failed: {exc}")
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception("top-io command failed: %s", exc)
             return HandleCommandResult(stderr=str(exc), retval=-errno.EINVAL)
