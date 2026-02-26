@@ -149,6 +149,7 @@ else:
             self.client: Any = None
             self.timestamp = time.time()
             self.health = Health()
+            self.clients: dict = {}
 
         @property
         def nqn_list(self):
@@ -347,11 +348,17 @@ else:
         def _fetch_subsystems(self):
             return self._call_grpc('list_subsystems', NVMeoFClient.pb2.list_subsystems_req())
 
+        def _get_client(self, group, service_url):
+            key = (group, service_url)
+            if key not in self.clients:
+                self.clients[key] = NVMeoFClient(group, service_url)
+            return self.clients[key]
+
         def initialise(self, tool):
             self.health = Health()
             self.tool = tool
-            self.client = NVMeoFClient(tool.args.get('group', ''),
-                                       tool.args.get('server_addr', ''))
+            self.client = self._get_client(tool.args.get('group', ''),
+                                           tool.args.get('server_addr', ''))
             self.server_addr = self.client.gateway_addr
 
             now = time.time()
@@ -381,7 +388,7 @@ else:
                     self.health.msg = f'Service {service_name} not found'
                     return
                 for gw in gateways[service_name]:
-                    client = NVMeoFClient(group, gw["service_url"])
+                    client = self._get_client(group, gw["service_url"])
                     self._fetch_thread_stats(client)
                     if not self.ready:
                         return
@@ -389,8 +396,9 @@ else:
                 self._fetch_thread_stats(self.client)
             logger.debug("collect_cpu_data completed")
 
-        def collect_io_data(self):  # pylint: disable=too-many-return-statements
-            self.subsystem_nqn = self.tool.subsystem_nqn
+        def _set_subsystem_and_namespaces(self):
+            if self.subsystems is not None and self.subsystem_nqn in self.namespaces:
+                return
 
             self.subsystems = self._fetch_subsystems()
             if self.subsystems is None or self.subsystems.status > 0:
@@ -418,6 +426,13 @@ else:
             logger.debug("Subsystem '%s' has %s namespaces",
                          self.subsystem_nqn, self.total_namespaces_defined)
 
+        def collect_io_data(self):
+            self.subsystem_nqn = self.tool.subsystem_nqn
+
+            self._set_subsystem_and_namespaces()
+            if not self.ready:
+                return
+
             group = self.tool.args.get('group', '')
             if not self.tool.args.get('server_addr'):
                 service_name = self.client.service_name
@@ -436,7 +451,7 @@ else:
                     )
                     return
                 for gw in gateways[service_name]:
-                    client = NVMeoFClient(group, gw["service_url"])
+                    client = self._get_client(group, gw["service_url"])
                     self._fetch_namespace_iostats(client)
                     if not self.ready:
                         return
