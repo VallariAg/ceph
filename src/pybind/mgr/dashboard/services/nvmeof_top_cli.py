@@ -149,6 +149,7 @@ else:
             self.client: Any = None
             self.timestamp = time.time()
             self.health = Health()
+            self.clients: dict = {}
 
         @property
         def nqn_list(self):
@@ -189,6 +190,7 @@ else:
         def get_sorted_namespaces(self, sort_pos: int, reverse_sort: bool):
             logger.debug("get_sorted_namespaces")
             ns_data = []
+            t0 = time.time() #TODO
             for ns in self.namespaces[self.subsystem_nqn]:
                 bdev_name = ns.bdev_name
 
@@ -228,6 +230,7 @@ else:
                     self.qos_enabled(ns)
                 ))
 
+            logger.info("VALLARI_DEBUG: get_sorted_namespaces loop over %s namespaces: %.3fs", len(self.namespaces[self.subsystem_nqn]), time.time()-t0)
             ns_data.sort(key=lambda t: t[sort_pos], reverse=reverse_sort)
             return ns_data
 
@@ -294,14 +297,17 @@ else:
         def _fetch_namespace_iostats(self, client):
             daemon_name = client.daemon_name
             logger.debug("fetching iostats for namespaces from %s", daemon_name)
+            t0 = time.time() # TODO
             stats = self._call_grpc('list_namespaces_io_stats',
                                     NVMeoFClient.pb2.list_namespaces_io_stats_req(), client)
+            logger.info("VALLARI_DEBUG: grpc list_namespaces_io_stats from %s: %.3fs", daemon_name, time.time()-t0)
             logger.debug("list_namespaces_io_stats stats=%s", stats)
             if stats is None:
                 return
             if daemon_name not in self.iostats:
                 self.iostats[daemon_name] = {}
 
+            t1 = time.time() #TODO
             for ns in stats.namespaces:
                 bdev_name = ns.bdev_name
                 if bdev_name not in self.iostats[daemon_name]:
@@ -314,6 +320,7 @@ else:
                 ns_stats.write_ops.update(ns.num_write_ops)
                 ns_stats.write_bytes.update(ns.bytes_written)
                 ns_stats.write_secs.update((ns.write_latency_ticks / stats.tick_rate))
+            logger.info("VALLARI_DEBUG: processing %s ns stats from %s: %.3fs", len(stats.namespaces), daemon_name, time.time()-t1)
 
         def _fetch_namespaces(self, subsystem_nqn):
             return self._call_grpc(
@@ -347,11 +354,17 @@ else:
         def _fetch_subsystems(self):
             return self._call_grpc('list_subsystems', NVMeoFClient.pb2.list_subsystems_req())
 
+        def _get_client(self, group, service_url):
+            key = (group, service_url)
+            if key not in self.clients:
+                self.clients[key] = NVMeoFClient(group, service_url)
+            return self.clients[key]
+
         def initialise(self, tool):
             self.health = Health()
             self.tool = tool
-            self.client = NVMeoFClient(tool.args.get('group', ''),
-                                       tool.args.get('server_addr', ''))
+            self.client = self._get_client(tool.args.get('group', ''),
+                                           tool.args.get('server_addr', ''))
             self.server_addr = self.client.gateway_addr
 
             now = time.time()
@@ -381,7 +394,7 @@ else:
                     self.health.msg = f'Service {service_name} not found'
                     return
                 for gw in gateways[service_name]:
-                    client = NVMeoFClient(group, gw["service_url"])
+                    client = self._get_client(group, gw["service_url"])
                     self._fetch_thread_stats(client)
                     if not self.ready:
                         return
@@ -436,8 +449,10 @@ else:
                     )
                     return
                 for gw in gateways[service_name]:
-                    client = NVMeoFClient(group, gw["service_url"])
+                    t_gw = time.time() #TODO
+                    client = self._get_client(group, gw["service_url"])
                     self._fetch_namespace_iostats(client)
+                    logger.info("VALLARI_DEBUG: total time to get namespace iostat for %s: %.3fs", client.daemon_name, time.time()-t_gw)
                     if not self.ready:
                         return
             else:
