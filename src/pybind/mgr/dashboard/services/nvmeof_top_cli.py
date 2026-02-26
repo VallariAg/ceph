@@ -402,10 +402,14 @@ else:
                 self._fetch_thread_stats(self.client)
             logger.debug("collect_cpu_data completed")
 
-        def collect_io_data(self):  # pylint: disable=too-many-return-statements
-            self.subsystem_nqn = self.tool.subsystem_nqn
+        def _set_subsystem_and_namespaces(self):
+            """Fetch and cache subsystems and namespaces if not already set."""
+            if self.subsystems is not None and self.subsystem_nqn in self.namespaces:
+                return
 
+            _t = time.time()
             self.subsystems = self._fetch_subsystems()
+            logger.info("VALLARI_DEBUG: _fetch_subsystems: %.3fs", time.time() - _t)
             if self.subsystems is None or self.subsystems.status > 0:
                 logger.error("Failed to retrieve subsystems list")
                 self.health.rc = -errno.ECONNREFUSED
@@ -423,7 +427,9 @@ else:
                 self.health.msg = "Subsystem NQN provided not found"
                 return
 
+            _t = time.time()
             namespace_info = self._fetch_namespaces(self.subsystem_nqn)
+            logger.info("VALLARI_DEBUG: _fetch_namespaces: %.3fs", time.time() - _t)
             if namespace_info is None:
                 return
 
@@ -431,16 +437,27 @@ else:
             logger.debug("Subsystem '%s' has %s namespaces",
                          self.subsystem_nqn, self.total_namespaces_defined)
 
+        def collect_io_data(self):  # pylint: disable=too-many-return-statements
+            self.subsystem_nqn = self.tool.subsystem_nqn
+
+            self._set_subsystem_and_namespaces()
+            if not self.ready:
+                return
+
             group = self.tool.args.get('group', '')
             if not self.tool.args.get('server_addr'):
                 service_name = self.client.service_name
+                _t = time.time()
                 gw_conf = NvmeofGatewaysConfig.get_gateways_config()
+                logger.info("VALLARI_DEBUG: get_gateways_config: %.3fs", time.time() - _t)
                 gateways = gw_conf.get("gateways", {})
                 if service_name not in gateways:
                     self.health.rc = -errno.ENOENT
                     self.health.msg = f'Service {service_name} not found'
                     return
+                _t = time.time()
                 self.lbg_to_gateway = get_lbg_gws_map(service_name)
+                logger.info("VALLARI_DEBUG: get_lbg_gws_map: %.3fs", time.time() - _t)
                 if not self.lbg_to_gateway:
                     self.health.rc = -errno.ENOENT
                     self.health.msg = (
