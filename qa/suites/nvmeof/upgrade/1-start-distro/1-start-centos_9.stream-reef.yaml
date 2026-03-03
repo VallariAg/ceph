@@ -1,0 +1,20 @@
+os_type: centos
+os_version: "9.stream"
+
+tasks:
+- cephadm:
+    image: quay.ceph.io/ceph-ci/ceph:reef-nvmeof
+    compiled_cephadm_branch: reef-nvmeof
+
+- nvmeof:
+    installer: host.a
+    rbd:
+      pool_name: mypool
+      image_name_prefix: myimage
+    gateway_config:
+      enable_groups: false
+      subsystems_count: 3
+      namespaces_count: 20
+
+- cephadm.wait_for_service:
+    service: nvmeof.mypool # TODO: upgrade reef->higher version requires some work on gw "group"?
