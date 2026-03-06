@@ -7,7 +7,7 @@ from textwrap import dedent
 from gevent.event import Event
 from gevent.greenlet import Greenlet
 from teuthology.task import Task
-from teuthology import misc
+from teuthology import misc, contextutil
 from teuthology.exceptions import ConfigError
 from teuthology.orchestra import run
 from tasks.util import get_remote_for_role
@@ -343,9 +343,9 @@ class NvmeofThrasher(Thrasher, Greenlet):
         self.daemon_max_thrash_times = int(self.config.get('daemon_max_thrash_times', 4))
         self.daemon_max_thrash_period = int(self.config.get('daemon_max_thrash_period', 30 * 60)) # seconds
 
-        self.min_thrash_delay = int(self.config.get('min_thrash_delay', 60))
+        self.min_thrash_delay = int(self.config.get('min_thrash_delay', 100))
         self.max_thrash_delay = int(self.config.get('max_thrash_delay', self.min_thrash_delay + 30))
-        self.min_revive_delay = int(self.config.get('min_revive_delay', 60))
+        self.min_revive_delay = int(self.config.get('min_revive_delay', 100))
         self.max_revive_delay = int(self.config.get('max_revive_delay', self.min_revive_delay + 30))
 
     def _get_devices(self, remote):
@@ -381,7 +381,8 @@ class NvmeofThrasher(Thrasher, Greenlet):
         Run some checks to see if everything is running well during thrashing.
         """
         self.log('display and verify stats:')
-        for retry in range(5):
+        max_retry = 5
+        for retry in range(1, max_retry+1):
             try: 
                 random_gateway_host = None
                 initiator_host = self.checker_host 
@@ -404,6 +405,8 @@ class NvmeofThrasher(Thrasher, Greenlet):
                 break
             except run.CommandFailedError:
                 self.log(f"retry do_checks() for {retry} time")
+                if retry == max_retry:
+                    raise
 
     def switch_task(self):
         """
@@ -435,6 +438,8 @@ class NvmeofThrasher(Thrasher, Greenlet):
         ]
         chosen_method = self.rng.choice(kill_methods)
         d_name = '%s.%s' % (daemon.type_, daemon.id_)
+        self.log('kill {dname} by {method}'.format(
+            dname=d_name, method=chosen_method))
         if chosen_method == "ceph_daemon_stop": 
             daemon.remote.run(args=[
                 "ceph", "orch", "daemon", "stop",
@@ -464,11 +469,30 @@ class NvmeofThrasher(Thrasher, Greenlet):
                 "ceph", "orch", "daemon", "start",
                 name
             ])
+        elif killed_method == "daemon_remove": 
+            self._wait_for_daemon(daemon)
         else:
             daemon.remote.run(args=[
                 "ceph", "orch", "daemon", "start",
                 name
             ])
+    
+    def _wait_for_daemon(self, daemon, tries=15):
+        # TODO: the core problem of bugs in thrashing is
+        # 1. ceph orch daemon rm takes 3+ mins to revive them (error in thrashing - "ceph orch start fails")
+        # 2. 900 namespaces take time - and iteration continues and next stop can happen in middle of re-adding ns (failed_daemon)
+        # 3. too many gateways (3) removed together take even more time (probably causing apply_spec)
+        # 4. in nvmeof_mon_tharsh: after "ceph orch daemon start" cmd failed, the thrasher didn't raise an exception and stopped the test (https://tracker.ceph.com/issues/75331#note-7)
+        dname = '%s.%s' % (daemon.type_, daemon.id_)
+        self.log(f'waiting for {dname} to start...') 
+        retry = 1
+        with contextutil.safe_while(sleep=20, tries=tries) as proceed:
+            while proceed():
+                out = daemon.remote.sh(daemon.status_cmd, check_status=False)
+                if "running" in out:
+                    break
+                retry += 1
+                self.log(f'waiting for {dname} to start (retry: {retry}/{tries})')
 
     def do_thrash(self):
         self.log('start thrashing')
@@ -504,7 +528,6 @@ class NvmeofThrasher(Thrasher, Greenlet):
                                  f'in {self.daemon_max_thrash_period} seconds.')
                         continue
 
-                self.log('kill {label}'.format(label=daemon.id_))
                 kill_method = self.kill_daemon(daemon)
 
                 killed_daemons[kill_method].append(daemon)
@@ -530,8 +553,8 @@ class NvmeofThrasher(Thrasher, Greenlet):
                 # revive after thrashing
                 for kill_method in killed_daemons:
                     for daemon in killed_daemons[kill_method]:
-                        self.log('reviving {label}'.format(label=daemon.id_))
-                        # daemon.restart()
+                        self.log('reviving {label} from {kmethod}'.format(
+                            label=daemon.id_, kmethod=kill_method))
                         self.revive_daemon(daemon, kill_method)
                 
                 # delay before thrashing
