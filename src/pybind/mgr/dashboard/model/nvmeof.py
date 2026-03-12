@@ -82,6 +82,7 @@ class Subsystem(NamedTuple):
     has_dhchap_key: bool
     allow_any_host: bool
     created_without_key: bool = False
+    network_mask: Annotated[List[str], CliFieldTransformer(lambda v: "\n".join(v))] = []
 
 
 class SubsystemList(NamedTuple):
@@ -192,6 +193,7 @@ class Listener(NamedTuple):
     active: Optional[bool]
     adrfam: Annotated[int, CliHeader("Address Family")] = 0  # 0: IPv4, 1: IPv6
     trsvcid: Annotated[int, CliHeader("Target Port")] = 4420
+    manual: Optional[bool] = None
 
 
 class ListenerList(NamedTuple):
