@@ -419,7 +419,7 @@ class CLICommandBase(object):
         self.arg_spec = {}    # type: Dict[str, Any]
         self.first_default = -1
 
-    KNOWN_ARGS = '_', 'self', 'mgr', 'inbuf', 'return'
+    KNOWN_ARGS = '_', 'self', 'mgr', 'inbuf', 'return', 'session_id'
 
     @classmethod
     def _load_func_metadata(cls: Any, f: HandlerFuncType) -> Tuple[str, Dict[str, Any], int, str]:
@@ -438,6 +438,11 @@ class CLICommandBase(object):
                 # in the full_argspec and not already in the arg_spec
                 if arg == 'inbuf' and 'inbuf' not in arg_spec:
                     arg_spec['inbuf'] = 'str'
+                # session_id is injected by the client for poll commands;
+                # record it in arg_spec so it can be passed to the handler,
+                # but keep it out of args so it is hidden from help text
+                if arg == 'session_id' and 'session_id' not in arg_spec:
+                    arg_spec['session_id'] = Optional[str]
                 continue
             if arg == '_end_positional_':
                 positional = False
@@ -528,6 +533,10 @@ class CLICommandBase(object):
                     'Invalid command: Input file data (-i) not supported',
                 )
             kwargs['inbuf'] = inbuf
+        if 'session_id' in specials:
+            session_id = cmd_dict.get('session_id')
+            if session_id is not None:
+                kwargs['session_id'] = session_id
         assert self.func
         return self.func(mgr, **kwargs)
 
