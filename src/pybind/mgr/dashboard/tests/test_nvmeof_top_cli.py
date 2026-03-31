@@ -251,6 +251,21 @@ class TestNvmeofTopCommands(CLICommandTestMixin):
     def exec_nvmeof_cmd(cls, cmd, **kwargs):
         return cls.exec_cmd('', prefix=cmd, **kwargs)
 
+    @pytest.mark.parametrize('period', [0, -1, 3601])
+    def test_top_cpu_invalid_period(self, period):
+        with pytest.raises(CmdException) as exc_info:
+            self.exec_nvmeof_cmd('nvmeof top cpu', session_id='sess1', period=period)
+        assert exc_info.value.retcode == -errno.EINVAL
+        assert 'Invalid period' in str(exc_info.value)
+
+    @pytest.mark.parametrize('period', [0, -1, 3601])
+    def test_top_io_invalid_period(self, period):
+        with pytest.raises(CmdException) as exc_info:
+            self.exec_nvmeof_cmd('nvmeof top io', subsystem='nqn.test',
+                                 session_id='sess1', period=period)
+        assert exc_info.value.retcode == -errno.EINVAL
+        assert 'Invalid period' in str(exc_info.value)
+
     def test_top_io_missing_subsystem_returns_einval(self):
         with pytest.raises(CmdException) as exc_info:
             self.exec_nvmeof_cmd('nvmeof top io', subsystem='', session_id='sess1')

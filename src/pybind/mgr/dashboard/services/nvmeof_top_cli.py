@@ -24,8 +24,9 @@ try:
 except ImportError as e:
     logger.error("Failed to import NVMeoFClient and related components: %s", e)
 else:
+    MAX_SESSION_TTL = 60 * 60
+
     def get_collector(session_id: Optional[str]):
-        MAX_SESSION_TTL = 60 * 60
         return mgr.get_nvmeof_collector(session_id, MAX_SESSION_TTL)
 
     def get_lbg_gws_map(service_name: str):
@@ -592,6 +593,7 @@ else:
                        descending: bool = False, sort_by: str = 'Thread Name',
                        with_timestamp: bool = False,
                        no_header: bool = False,
+                       period: int = 1,
                        session_id: Optional[str] = None):
         '''
         NVMeoF Top CPU Tool
@@ -604,6 +606,11 @@ else:
         --with-timestamp
         --no-header
         '''
+        if not 1 <= period <= MAX_SESSION_TTL:
+            return HandleCommandResult(
+                stderr=f"Invalid period '{period}': must be between 1 and {MAX_SESSION_TTL}",
+                retval=-errno.EINVAL
+            )
         args = {
             'service': service,
             'with_timestamp': with_timestamp,
@@ -635,6 +642,7 @@ else:
                       descending: bool = False, sort_by: str = 'NSID',
                       with_timestamp: bool = False,
                       summary: bool = False, no_header: bool = False,
+                      period: int = 1,
                       session_id: Optional[str] = None):
         '''
         NVMeoF Top IO Tool
@@ -648,6 +656,11 @@ else:
         --summary
         --no-header
         '''
+        if not 1 <= period <= MAX_SESSION_TTL:
+            return HandleCommandResult(
+                stderr=f"Invalid period '{period}': must be between 1 and {MAX_SESSION_TTL}",
+                retval=-errno.EINVAL
+            )
         args = {
             'subsystem': subsystem,
             'with_timestamp': with_timestamp,
