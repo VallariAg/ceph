@@ -3,6 +3,7 @@
 # https://github.com/pcuzner/ceph-nvmeof-top
 # by Paul Cuzner <pcuzner@ibm.com>
 import errno
+import ipaddress
 import json
 import logging
 import time
@@ -587,6 +588,22 @@ else:
 
             return ''.join(rows)
 
+    def _validate_common_args(period: int, server_addr: str) -> Optional[HandleCommandResult]:
+        if not 1 <= period <= MAX_SESSION_TTL:
+            return HandleCommandResult(
+                stderr=f"Invalid period '{period}': must be between 1 and {MAX_SESSION_TTL}",
+                retval=-errno.EINVAL
+            )
+        if server_addr:
+            try:
+                ipaddress.ip_address(server_addr)
+            except Exception:
+                return HandleCommandResult(
+                    stderr=f"Invalid server-addr '{server_addr}': must be a valid IP address",
+                    retval=-errno.EINVAL
+                )
+        return None
+
     @DBCLICommand.Read('nvmeof top cpu', poll=True)
     def nvmeof_top_cpu(_, service: str = '',
                        server_addr: str = '', group: str = '',
@@ -606,9 +623,13 @@ else:
         --with-timestamp
         --no-header
         '''
-        if not 1 <= period <= MAX_SESSION_TTL:
+        err = _validate_common_args(period, server_addr)
+        if err:
+            return err
+        if sort_by not in NVMeoFTopCPU.reactors_headers:
             return HandleCommandResult(
-                stderr=f"Invalid period '{period}': must be between 1 and {MAX_SESSION_TTL}",
+                stderr=f"Invalid sort-by '{sort_by}': must match a header title: "
+                       f"{NVMeoFTopCPU.reactors_headers}",
                 retval=-errno.EINVAL
             )
         args = {
@@ -656,9 +677,13 @@ else:
         --summary
         --no-header
         '''
-        if not 1 <= period <= MAX_SESSION_TTL:
+        err = _validate_common_args(period, server_addr)
+        if err:
+            return err
+        if sort_by not in NVMeoFTopIO.ns_headers:
             return HandleCommandResult(
-                stderr=f"Invalid period '{period}': must be between 1 and {MAX_SESSION_TTL}",
+                stderr=f"Invalid sort-by '{sort_by}': must match a header title: "
+                       f"{NVMeoFTopIO.ns_headers}",
                 retval=-errno.EINVAL
             )
         args = {

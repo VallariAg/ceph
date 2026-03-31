@@ -266,6 +266,45 @@ class TestNvmeofTopCommands(CLICommandTestMixin):
         assert exc_info.value.retcode == -errno.EINVAL
         assert 'Invalid period' in str(exc_info.value)
 
+    def test_top_cpu_invalid_sort_by(self):
+        with pytest.raises(CmdException) as exc_info:
+            self.exec_nvmeof_cmd('nvmeof top cpu', session_id='sess1', sort_by='invalid')
+        assert exc_info.value.retcode == -errno.EINVAL
+        assert "Invalid sort-by 'invalid': must match a header title" in str(exc_info.value)
+
+    def test_top_io_invalid_sort_by(self):
+        with pytest.raises(CmdException) as exc_info:
+            self.exec_nvmeof_cmd('nvmeof top io', subsystem='nqn.test',
+                                 session_id='sess1', sort_by='invalid')
+        assert exc_info.value.retcode == -errno.EINVAL
+        assert "Invalid sort-by 'invalid': must match a header title" in str(exc_info.value)
+
+    def test_top_cpu_invalid_sort_by(self):
+        with pytest.raises(CmdException) as exc_info:
+            self.exec_nvmeof_cmd('nvmeof top cpu', session_id='sess1', sort_by='invalid')
+        assert exc_info.value.retcode == -errno.EINVAL
+        assert "Invalid sort-by 'invalid': must match a header title" in str(exc_info.value)
+
+    def test_top_io_invalid_sort_by(self):
+        with pytest.raises(CmdException) as exc_info:
+            self.exec_nvmeof_cmd('nvmeof top io', subsystem='nqn.test',
+                                 session_id='sess1', sort_by='invalid')
+        assert exc_info.value.retcode == -errno.EINVAL
+        assert "Invalid sort-by 'invalid': must match a header title" in str(exc_info.value)
+
+    def test_top_cpu_invalid_server_addr(self):
+        with pytest.raises(CmdException) as exc_info:
+            self.exec_nvmeof_cmd('nvmeof top cpu', session_id='sess1', server_addr='not-an-ip')
+        assert exc_info.value.retcode == -errno.EINVAL
+        assert "Invalid server-addr 'not-an-ip': must be a valid IP address" in str(exc_info.value)
+
+    def test_top_io_invalid_server_addr(self):
+        with pytest.raises(CmdException) as exc_info:
+            self.exec_nvmeof_cmd('nvmeof top io', subsystem='nqn.test',
+                                 session_id='sess1', server_addr='not-an-ip')
+        assert exc_info.value.retcode == -errno.EINVAL
+        assert "Invalid server-addr 'not-an-ip': must be a valid IP address" in str(exc_info.value)
+
     def test_top_io_missing_subsystem_returns_einval(self):
         with pytest.raises(CmdException) as exc_info:
             self.exec_nvmeof_cmd('nvmeof top io', subsystem='', session_id='sess1')
