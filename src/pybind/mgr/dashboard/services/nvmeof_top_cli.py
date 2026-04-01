@@ -196,7 +196,7 @@ else:
                 bdev_name = ns.bdev_name
 
                 daemon_name = ""
-                if self.tool.args.get('server_addr'):
+                if self.tool.args.get('server_address'):
                     # only show namespaces owned by this gateway's LBG
                     if ns.load_balancing_group != self.load_balancing_group:
                         continue
@@ -359,8 +359,8 @@ else:
         def initialise(self, tool):
             self.health = Health()
             self.tool = tool
-            self.client = self._get_client(tool.args.get('group', ''),
-                                           tool.args.get('server_addr', ''))
+            self.client = self._get_client(tool.args.get('gw_group', ''),
+                                           tool.args.get('server_address', ''))
             self.server_addr = self.client.gateway_addr
 
             now = time.time()
@@ -381,7 +381,7 @@ else:
 
         def collect_cpu_data(self):
             service_name = self.tool.service_name
-            group = self.tool.args.get('group', '')
+            group = self.tool.args.get('gw_group', '')
             if service_name:
                 gw_conf = NvmeofGatewaysConfig.get_gateways_config()
                 gateways = gw_conf.get("gateways", {})
@@ -435,8 +435,8 @@ else:
             if not self.ready:
                 return
 
-            group = self.tool.args.get('group', '')
-            if not self.tool.args.get('server_addr'):
+            group = self.tool.args.get('gw_group', '')
+            if not self.tool.args.get('server_address'):
                 service_name = self.client.service_name
                 gw_conf = NvmeofGatewaysConfig.get_gateways_config()
                 gateways = gw_conf.get("gateways", {})
@@ -546,7 +546,7 @@ else:
 
         def __init__(self, args: dict, data_collector):
             super().__init__(args, data_collector)
-            self.subsystem_nqn = args.get('subsystem')
+            self.subsystem_nqn = args.get('nqn')
 
         def _collect(self):
             self.collector.collect_io_data()
@@ -569,7 +569,7 @@ else:
                                           time.localtime(self.collector.timestamp))
                 rows.append(f"{timestamp} (delay: {self.collector.delay:.2f}s)\n")
             if self.args.get('summary'):
-                if self.args.get('server_addr'):
+                if self.args.get('server_address'):
                     summary_row = ""
                     for index, header in enumerate(NVMeoFTopIO.summary_headers):
                         summary_row += f"{header}: {overall_summary_data[index]}  "
@@ -588,25 +588,25 @@ else:
 
             return ''.join(rows)
 
-    def _validate_common_args(period: int, server_addr: str) -> Optional[HandleCommandResult]:
+    def _validate_common_args(period: int, server_address: str) -> Optional[HandleCommandResult]:
         if not 1 <= period <= MAX_SESSION_TTL:
             return HandleCommandResult(
                 stderr=f"Invalid period '{period}': must be between 1 and {MAX_SESSION_TTL}",
                 retval=-errno.EINVAL
             )
-        if server_addr:
+        if server_address:
             try:
-                ipaddress.ip_address(server_addr)
+                ipaddress.ip_address(server_address)
             except Exception:
                 return HandleCommandResult(
-                    stderr=f"Invalid server-addr '{server_addr}': must be a valid IP address",
+                    stderr=f"Invalid server-address '{server_address}': must be a valid IP address",
                     retval=-errno.EINVAL
                 )
         return None
 
     @DBCLICommand.Read('nvmeof top cpu', poll=True)
     def nvmeof_top_cpu(_, service: str = '',
-                       server_addr: str = '', group: str = '',
+                       server_address: str = '', gw_group: str = '',
                        descending: bool = False, sort_by: str = 'Thread Name',
                        with_timestamp: bool = False,
                        no_header: bool = False,
@@ -616,14 +616,14 @@ else:
         NVMeoF Top CPU Tool
         --period [-p] <delay> (default 1s, max 3600s)
         --service '<service_name>'
-        --server-addr <ip>
-        --group '<group_name>'
+        --server-address <ip>
+        --gw-group '<group_name>'
         --sort-by '<header>'
         --descending
         --with-timestamp
         --no-header
         '''
-        err = _validate_common_args(period, server_addr)
+        err = _validate_common_args(period, server_address)
         if err:
             return err
         if sort_by not in NVMeoFTopCPU.reactors_headers:
@@ -638,8 +638,8 @@ else:
             'no_header': no_header,
             'sort_descending': descending,
             'sort_by': sort_by,
-            'server_addr': server_addr,
-            'group': group,
+            'server_address': server_address,
+            'gw_group': gw_group,
         }
         try:
             data_collector = get_collector(session_id)
@@ -658,8 +658,8 @@ else:
             return HandleCommandResult(stderr=str(exc), retval=-errno.EINVAL)
 
     @DBCLICommand.Read('nvmeof top io', poll=True)
-    def nvmeof_top_io(_, subsystem: str = '',
-                      server_addr: str = '', group: str = '',
+    def nvmeof_top_io(_, nqn: str = '',
+                      server_address: str = '', gw_group: str = '',
                       descending: bool = False, sort_by: str = 'NSID',
                       with_timestamp: bool = False,
                       summary: bool = False, no_header: bool = False,
@@ -668,16 +668,16 @@ else:
         '''
         NVMeoF Top IO Tool
         --period [-p] <delay> (default 1s, max 3600s)
-        --subsystem '<nqn>'
-        --server-addr <ip>
-        --group '<group_name>'
+        --nqn '<nqn>'
+        --server-address <ip>
+        --gw-group '<group_name>'
         --descending
         --sort-by '<header>'
         --with-timestamp
         --summary
         --no-header
         '''
-        err = _validate_common_args(period, server_addr)
+        err = _validate_common_args(period, server_address)
         if err:
             return err
         if sort_by not in NVMeoFTopIO.ns_headers:
@@ -687,18 +687,18 @@ else:
                 retval=-errno.EINVAL
             )
         args = {
-            'subsystem': subsystem,
+            'nqn': nqn,
             'with_timestamp': with_timestamp,
             'summary': summary,
             'no_header': no_header,
             'sort_descending': descending,
             'sort_by': sort_by,
-            'server_addr': server_addr,
-            'group': group,
+            'server_address': server_address,
+            'gw_group': gw_group,
         }
-        if not subsystem:
+        if not nqn:
             return HandleCommandResult(
-                stderr="Required argument '--subsystem' missing",
+                stderr="Required argument '--nqn' missing",
                 retval=-errno.EINVAL
             )
         try:

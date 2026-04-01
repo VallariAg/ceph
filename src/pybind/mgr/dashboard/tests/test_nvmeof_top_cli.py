@@ -63,8 +63,8 @@ class TestNVMeoFTopCPUFormat:
         'with_timestamp': False,
         'no_header': False,
         'service': '',
-        'server_addr': '',
-        'group': '',
+        'server_address': '',
+        'gw_group': '',
     }
 
     def test_headers(self, cpu_collector):
@@ -110,9 +110,9 @@ class TestNVMeoFTopIOFormat:
         'with_timestamp': False,
         'no_header': False,
         'summary': False,
-        'subsystem': 'nqn.2024-01.io.spdk:cnode1',
-        'server_addr': '',
-        'group': '',
+        'nqn': 'nqn.2024-01.io.spdk:cnode1',
+        'server_address': '',
+        'gw_group': '',
     }
 
     def test_no_namespaces(self, io_collector):
@@ -161,7 +161,7 @@ class TestNvmeofTopCollector:
         c.client = MagicMock()
         c.client.service_name = 'myservice'
         c.tool = MagicMock()
-        c.tool.args = {'group': '', 'server_addr': ''}
+        c.tool.args = {'gw_group': '', 'server_address': ''}
         return c
 
     def test_grpc_call_failure(self, collector):
@@ -261,7 +261,7 @@ class TestNvmeofTopCommands(CLICommandTestMixin):
     @pytest.mark.parametrize('period', [0, -1, 3601])
     def test_top_io_invalid_period(self, period):
         with pytest.raises(CmdException) as exc_info:
-            self.exec_nvmeof_cmd('nvmeof top io', subsystem='nqn.test',
+            self.exec_nvmeof_cmd('nvmeof top io', nqn='nqn.test',
                                  session_id='sess1', period=period)
         assert exc_info.value.retcode == -errno.EINVAL
         assert 'Invalid period' in str(exc_info.value)
@@ -274,42 +274,29 @@ class TestNvmeofTopCommands(CLICommandTestMixin):
 
     def test_top_io_invalid_sort_by(self):
         with pytest.raises(CmdException) as exc_info:
-            self.exec_nvmeof_cmd('nvmeof top io', subsystem='nqn.test',
+            self.exec_nvmeof_cmd('nvmeof top io', nqn='nqn.test',
                                  session_id='sess1', sort_by='invalid')
         assert exc_info.value.retcode == -errno.EINVAL
         assert "Invalid sort-by 'invalid': must match a header title" in str(exc_info.value)
 
-    def test_top_cpu_invalid_sort_by(self):
+    def test_top_cpu_invalid_server_address(self):
         with pytest.raises(CmdException) as exc_info:
-            self.exec_nvmeof_cmd('nvmeof top cpu', session_id='sess1', sort_by='invalid')
+            self.exec_nvmeof_cmd('nvmeof top cpu', session_id='sess1', server_address='not-an-ip')
         assert exc_info.value.retcode == -errno.EINVAL
-        assert "Invalid sort-by 'invalid': must match a header title" in str(exc_info.value)
+        assert "Invalid server-address 'not-an-ip': must be a valid IP address" in str(exc_info.value)
 
-    def test_top_io_invalid_sort_by(self):
+    def test_top_io_invalid_server_address(self):
         with pytest.raises(CmdException) as exc_info:
-            self.exec_nvmeof_cmd('nvmeof top io', subsystem='nqn.test',
-                                 session_id='sess1', sort_by='invalid')
+            self.exec_nvmeof_cmd('nvmeof top io', nqn='nqn.test',
+                                 session_id='sess1', server_address='not-an-ip')
         assert exc_info.value.retcode == -errno.EINVAL
-        assert "Invalid sort-by 'invalid': must match a header title" in str(exc_info.value)
+        assert "Invalid server-address 'not-an-ip': must be a valid IP address" in str(exc_info.value)
 
-    def test_top_cpu_invalid_server_addr(self):
+    def test_top_io_missing_nqn_returns_einval(self):
         with pytest.raises(CmdException) as exc_info:
-            self.exec_nvmeof_cmd('nvmeof top cpu', session_id='sess1', server_addr='not-an-ip')
+            self.exec_nvmeof_cmd('nvmeof top io', nqn='', session_id='sess1')
         assert exc_info.value.retcode == -errno.EINVAL
-        assert "Invalid server-addr 'not-an-ip': must be a valid IP address" in str(exc_info.value)
-
-    def test_top_io_invalid_server_addr(self):
-        with pytest.raises(CmdException) as exc_info:
-            self.exec_nvmeof_cmd('nvmeof top io', subsystem='nqn.test',
-                                 session_id='sess1', server_addr='not-an-ip')
-        assert exc_info.value.retcode == -errno.EINVAL
-        assert "Invalid server-addr 'not-an-ip': must be a valid IP address" in str(exc_info.value)
-
-    def test_top_io_missing_subsystem_returns_einval(self):
-        with pytest.raises(CmdException) as exc_info:
-            self.exec_nvmeof_cmd('nvmeof top io', subsystem='', session_id='sess1')
-        assert exc_info.value.retcode == -errno.EINVAL
-        assert str(exc_info.value) == "Required argument '--subsystem' missing"
+        assert str(exc_info.value) == "Required argument '--nqn' missing"
 
     def test_top_cpu_success(self):
         with patch('dashboard.services.nvmeof_top_cli.get_collector') as mock_gc:
@@ -335,7 +322,7 @@ class TestNvmeofTopCommands(CLICommandTestMixin):
             with patch.object(NVMeoFTopIO, 'run', return_value=(0, 'io output\n')):
                 result = self.exec_nvmeof_cmd(
                     'nvmeof top io',
-                    subsystem='nqn.test',
+                    nqn='nqn.test',
                     session_id='sess2'
                 )
                 assert 'io output' in result
@@ -355,7 +342,7 @@ class TestNvmeofTopCommands(CLICommandTestMixin):
             with pytest.raises(CmdException) as exc_info:
                 self.exec_nvmeof_cmd(
                     'nvmeof top io',
-                    subsystem='nqn.test',
+                    nqn='nqn.test',
                     session_id='sess2'
                 )
             assert exc_info.value.retcode == -errno.EINVAL
