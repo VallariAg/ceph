@@ -140,7 +140,8 @@ else:
         def __init__(self):
             self.tool: Any = None
             self.subsystem_nqn = ''
-            self.server_addr = ''
+            self.service = ''
+            self.group = ''
             self.delay: float = 0.0
             self.namespaces = {}
             self.lbg_to_gateway: dict = {}
@@ -256,7 +257,14 @@ else:
 
         def get_overall_summary_data(self):
             return [
-                self.server_addr,
+                self.group,
+                self.total_subsystems,
+                self.total_namespaces_overall,
+            ]
+
+        def get_gateway_summary_data(self):
+            return [
+                self.client.gateway_addr,
                 self.load_balancing_group,
                 self.total_subsystems,
                 self.total_namespaces_overall,
@@ -356,46 +364,95 @@ else:
                 self.clients[key] = NVMeoFClient(group, service_url)
             return self.clients[key]
 
+        def _set_gateways(self, server_address: str, gw_group: str):
+            if self.service:
+                return
+
+            services = NvmeofGatewaysConfig.get_gateways_config().get("gateways", {})
+
+            if not services:
+                self.health.rc = -errno.ENOENT
+                self.health.msg = "No NVMeoF gateways configured"
+                return
+
+            if server_address:
+                gw_match = next(
+                    ((svc_name, gw) for svc_name, svc_gateways in services.items()
+                     for gw in svc_gateways if server_address in gw['service_url']),
+                    None
+                )
+                if not gw_match:
+                    self.health.rc = -errno.ENOENT
+                    self.health.msg = f"No gateway found matching address: {server_address}"
+                    return
+                svc_name, gw = gw_match
+                if gw_group and gw.get('group') != gw_group:
+                    self.health.rc = -errno.EINVAL
+                    self.health.msg = (
+                        f"Address '{server_address}' belongs to group "
+                        f"'{gw.get('group')}', not '{gw_group}'"
+                    )
+                    return
+                self.service, self.group = svc_name, gw.get('group', '')
+                self._get_client(self.group, gw['service_url'])
+                return
+            elif gw_group:
+                svc_entry = next(
+                    ((s, gs) for s, gs in services.items()
+                     if any(gw.get('group') == gw_group for gw in gs)),
+                    None
+                )
+                if not svc_entry:
+                    self.health.rc = -errno.ENOENT
+                    self.health.msg = f"Gateway group '{gw_group}' not found"
+                    return
+                svc_name, svc_gateways = svc_entry
+                self.service = svc_name
+                self.group = gw_group
+                for gw in svc_gateways:
+                    self._get_client(self.group, gw['service_url'])
+            elif len(services) == 1:
+                svc_name, svc_gateways = next(iter(services.items()))
+                self.service = svc_name
+                self.group = svc_gateways[0].get('group', '') if svc_gateways else ''
+                for gw in svc_gateways:
+                    self._get_client(self.group, gw['service_url'])
+            else:
+                self.health.rc = -errno.EINVAL
+                self.health.msg = (
+                    f"Multiple gateway groups found: {', '.join(services.keys())}. "
+                    "Specify a gateway group"
+                )
+
         def initialise(self, tool):
             self.health = Health()
             self.tool = tool
-            self.client = self._get_client(tool.args.get('gw_group', ''),
-                                           tool.args.get('server_address', ''))
-            self.server_addr = self.client.gateway_addr
+
+            self._set_gateways(
+                server_address=tool.args.get('server_address', ''),
+                gw_group=tool.args.get('gw_group', '')
+            )
+            if not self.ready:
+                return
 
             now = time.time()
             self.delay = (now - self.timestamp)
             self.timestamp = now
 
-            self.gw_info = self._fetch_gateway_info(self.client)
-            if not self.ready:
-                logger.error("Call to %s failed, RC=%s, MSG=%s",
-                             self.server_addr, self.health.rc, self.health.msg)
-                self.health.msg = (
-                    f"Unable to connect to {self.server_addr}, "
-                    "pass an available gateway as --server-addr"
-                )
-                return
+            self.client = next(iter(self.clients.values()))
 
-            logger.debug("Connected to %s", self.server_addr)
+            if self.gw_info is None:
+                self.gw_info = self._fetch_gateway_info(self.client)
+                if not self.ready:
+                    self.health.msg = f"Unable to connect to {self.client.gateway_addr}"
+                    return
+                logger.debug("Connected to %s", self.client.gateway_addr)
 
         def collect_cpu_data(self):
-            service_name = self.tool.service_name
-            group = self.tool.args.get('gw_group', '')
-            if service_name:
-                gw_conf = NvmeofGatewaysConfig.get_gateways_config()
-                gateways = gw_conf.get("gateways", {})
-                if service_name not in gateways:
-                    self.health.rc = -errno.ENOENT
-                    self.health.msg = f'Service {service_name} not found'
+            for client in self.clients.values():
+                self._fetch_thread_stats(client)
+                if not self.ready:
                     return
-                for gw in gateways[service_name]:
-                    client = self._get_client(group, gw["service_url"])
-                    self._fetch_thread_stats(client)
-                    if not self.ready:
-                        return
-            else:
-                self._fetch_thread_stats(self.client)
             logger.debug("collect_cpu_data completed")
 
         def _set_subsystem_and_namespaces(self):
@@ -435,30 +492,19 @@ else:
             if not self.ready:
                 return
 
-            group = self.tool.args.get('gw_group', '')
             if not self.tool.args.get('server_address'):
-                service_name = self.client.service_name
-                gw_conf = NvmeofGatewaysConfig.get_gateways_config()
-                gateways = gw_conf.get("gateways", {})
-                if service_name not in gateways:
-                    self.health.rc = -errno.ENOENT
-                    self.health.msg = f'Service {service_name} not found'
-                    return
-                self.lbg_to_gateway = get_lbg_gws_map(service_name)
+                self.lbg_to_gateway = get_lbg_gws_map(self.service)
                 if not self.lbg_to_gateway:
                     self.health.rc = -errno.ENOENT
                     self.health.msg = (
                         f'Failed to retrieve load balancing group '
-                        f'mapping for service {service_name}'
+                        f'mapping for service {self.service}'
                     )
                     return
-                for gw in gateways[service_name]:
-                    client = self._get_client(group, gw["service_url"])
-                    self._fetch_namespace_iostats(client)
-                    if not self.ready:
-                        return
-            else:
-                self._fetch_namespace_iostats(self.client)
+            for client in self.clients.values():
+                self._fetch_namespace_iostats(client)
+                if not self.ready:
+                    return
             logger.debug("collect_io_data completed")
 
     class NVMeoFTopTool:
@@ -500,10 +546,6 @@ else:
         reactors_headers = ['Gateway', 'Thread Name', 'Busy Rate%', 'Idle Rate%']
         reactors_template = "{:<30}   {:<30}   {:<20}   {:<20}\n"
 
-        def __init__(self, args: dict, data_collector):
-            super().__init__(args, data_collector)
-            self.service_name = args.get('service')
-
         def _collect(self):
             self.collector.collect_cpu_data()
 
@@ -532,8 +574,9 @@ else:
 
     class NVMeoFTopIO(NVMeoFTopTool):
         subsystem_summary_headers = ['Subsystem', 'Namespaces']
-        summary_headers = ['Gateway', 'Load Balancing Group',
-                           'Total Subsystems', 'Total Namespaces']
+        gateway_summary_headers = ['Gateway', 'Load Balancing Group',
+                                   'Total Subsystems', 'Total Namespaces']
+        summary_headers = ['Group', 'Total Subsystems', 'Total Namespaces']
 
         ns_headers = [
             'NSID', 'RBD Image', 'IOPS', 'r/s', 'rMB/s', 'r_await', 'rareq-sz',
@@ -569,11 +612,15 @@ else:
                                           time.localtime(self.collector.timestamp))
                 rows.append(f"{timestamp} (delay: {self.collector.delay:.2f}s)\n")
             if self.args.get('summary'):
+                summary_row = ""
                 if self.args.get('server_address'):
-                    summary_row = ""
+                    gateway_summary_data = self.collector.get_gateway_summary_data()
+                    for index, header in enumerate(NVMeoFTopIO.gateway_summary_headers):
+                        summary_row += f"{header}: {gateway_summary_data[index]}  "
+                else:
                     for index, header in enumerate(NVMeoFTopIO.summary_headers):
                         summary_row += f"{header}: {overall_summary_data[index]}  "
-                    rows.append(summary_row + "\n")
+                rows.append(summary_row + "\n")
                 subsys_summary_row = ""
                 for index, header in enumerate(NVMeoFTopIO.subsystem_summary_headers):
                     subsys_summary_row += f"{header}: {subsystem_summary_data[index]}  "
@@ -605,8 +652,7 @@ else:
         return None
 
     @DBCLICommand.Read('nvmeof top cpu', poll=True)
-    def nvmeof_top_cpu(_, service: str = '',
-                       server_address: str = '', gw_group: str = '',
+    def nvmeof_top_cpu(_, server_address: str = '', gw_group: str = '',
                        descending: bool = False, sort_by: str = 'Thread Name',
                        with_timestamp: bool = False,
                        no_header: bool = False,
@@ -615,7 +661,6 @@ else:
         '''
         NVMeoF Top CPU Tool
         --period [-p] <delay> (default 1s, max 3600s)
-        --service '<service_name>'
         --server-address <ip>
         --gw-group '<group_name>'
         --sort-by '<header>'
@@ -633,7 +678,6 @@ else:
                 retval=-errno.EINVAL
             )
         args = {
-            'service': service,
             'with_timestamp': with_timestamp,
             'no_header': no_header,
             'sort_descending': descending,
