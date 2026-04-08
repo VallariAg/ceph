@@ -11,6 +11,7 @@ tasks:
 - cephadm.shell:
     env: [sha1]
     mon.a:
+      - ceph config set mgr mgr/cephadm/container_image_nvmeof quay.io/barakda1/nvmeof:test_beacon_diff_upgrade
       # print status before upgrade
       - ceph health detail
       - ceph orch ps
