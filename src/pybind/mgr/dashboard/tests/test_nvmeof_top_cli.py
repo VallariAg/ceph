@@ -5,7 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ..services.nvmeof_top_cli import Counter, NvmeofTopCollector, NVMeoFTopCPU, NVMeoFTopIO
+from ..services.nvmeof_top_cli import MAX_SESSION_TTL, Counter, \
+    NvmeofTopCollector, NVMeoFTopCPU, NVMeoFTopIO
 from ..tests import CLICommandTestMixin, CmdException
 
 
@@ -64,6 +65,7 @@ class TestNVMeoFTopCPUFormat:
         'with_timestamp': False,
         'no_header': False,
         'server_address': '',
+        'server_port': None,
         'gw_group': '',
         'period': 1,
         'session_id': None,
@@ -119,6 +121,7 @@ class TestNVMeoFTopIOFormat:
         'summary': False,
         'nqn': 'nqn.2024-01.io.spdk:cnode1',
         'server_address': '',
+        'server_port': None,
         'gw_group': '',
         'period': 1,
         'session_id': None,
@@ -218,7 +221,7 @@ class TestNvmeofTopCollector:
         }}
         with patch('dashboard.services.nvmeof_top_cli.NvmeofGatewaysConfig.get_gateways_config',
                    return_value=config):
-            collector._set_gateways('9.9.9.9', '')  # pylint: disable=protected-access
+            collector._set_gateways('', '9.9.9.9')  # pylint: disable=protected-access
         assert collector.health.rc == -errno.ENOENT
         assert 'No gateway found matching address' in collector.health.msg
 
@@ -230,7 +233,7 @@ class TestNvmeofTopCollector:
         }}
         with patch('dashboard.services.nvmeof_top_cli.NvmeofGatewaysConfig.get_gateways_config',
                    return_value=config):
-            collector._set_gateways('', 'nonexistent')  # pylint: disable=protected-access
+            collector._set_gateways('nonexistent', '')  # pylint: disable=protected-access
         assert collector.health.rc == -errno.ENOENT
         assert "Gateway group 'nonexistent' not found" in collector.health.msg
 
@@ -242,7 +245,7 @@ class TestNvmeofTopCollector:
         }}
         with patch('dashboard.services.nvmeof_top_cli.NvmeofGatewaysConfig.get_gateways_config',
                    return_value=config):
-            collector._set_gateways('1.1.1.1', 'group2')  # pylint: disable=protected-access
+            collector._set_gateways('group2', '1.1.1.1')  # pylint: disable=protected-access
         assert collector.health.rc == -errno.EINVAL
         assert "Address '1.1.1.1' belongs to group 'group1', not 'group2'" in collector.health.msg
 
@@ -269,7 +272,7 @@ class TestNvmeofTopCollector:
         with patch('dashboard.services.nvmeof_top_cli.NvmeofGatewaysConfig.get_gateways_config',
                    return_value=config), \
              patch.object(collector, '_get_client'):
-            collector._set_gateways('', 'group1')  # pylint: disable=protected-access
+            collector._set_gateways('group1', '')  # pylint: disable=protected-access
         assert collector.service == 'nvmeof.pool.group1'
         assert collector.group == 'group1'
 
@@ -282,9 +285,55 @@ class TestNvmeofTopCollector:
         with patch('dashboard.services.nvmeof_top_cli.NvmeofGatewaysConfig.get_gateways_config',
                    return_value=config), \
              patch.object(collector, '_get_client'):
-            collector._set_gateways('1.1.1.1', '')  # pylint: disable=protected-access
+            collector._set_gateways('', '1.1.1.1')  # pylint: disable=protected-access
         assert collector.service == 'nvmeof.pool.group1'
         assert collector.group == 'group1'
+
+    def test_set_gateways_by_address_no_substring_match(self, collector):
+        collector.service = ''
+        collector.group = ''
+        config = {'gateways': {
+            'nvmeof.pool.group1': [{'service_url': '1.1.1.11:5500', 'group': 'group1'}],
+        }}
+        with patch('dashboard.services.nvmeof_top_cli.NvmeofGatewaysConfig.get_gateways_config',
+                   return_value=config):
+            collector._set_gateways('', '1.1.1.1')  # pylint: disable=protected-access
+        assert collector.health.rc == -errno.ENOENT
+
+    def test_set_gateways_by_address_and_port(self, collector):
+        collector.service = ''
+        collector.group = ''
+        config = {'gateways': {
+            'nvmeof.pool.group1': [{'service_url': '1.1.1.1:5500', 'group': 'group1'}],
+        }}
+        with patch('dashboard.services.nvmeof_top_cli.NvmeofGatewaysConfig.get_gateways_config',
+                   return_value=config), \
+             patch.object(collector, '_get_client'):
+            collector._set_gateways('', '1.1.1.1', 5500)  # pylint: disable=protected-access
+        assert collector.service == 'nvmeof.pool.group1'
+
+    def test_set_gateways_port_mismatch(self, collector):
+        collector.service = ''
+        collector.group = ''
+        config = {'gateways': {
+            'nvmeof.pool.group1': [{'service_url': '1.1.1.1:5500', 'group': 'group1'}],
+        }}
+        with patch('dashboard.services.nvmeof_top_cli.NvmeofGatewaysConfig.get_gateways_config',
+                   return_value=config):
+            collector._set_gateways('', '1.1.1.1', 9999)  # pylint: disable=protected-access
+        assert collector.health.rc == -errno.ENOENT
+
+    def test_set_gateways_ipv6_address(self, collector):
+        collector.service = ''
+        collector.group = ''
+        config = {'gateways': {
+            'nvmeof.pool.group1': [{'service_url': '[::1]:5500', 'group': 'group1'}],
+        }}
+        with patch('dashboard.services.nvmeof_top_cli.NvmeofGatewaysConfig.get_gateways_config',
+                   return_value=config), \
+             patch.object(collector, '_get_client'):
+            collector._set_gateways('', '::1')  # pylint: disable=protected-access
+        assert collector.service == 'nvmeof.pool.group1'
 
     def test_collect_io_data_subsystems_unavailable(self, collector):
         collector.tool.subsystem_nqn = 'nqn.test'
@@ -331,6 +380,64 @@ class TestNvmeofTopCollector:
         assert collector.health.rc == -errno.ENOENT
         assert collector.health.msg == \
             'Failed to retrieve load balancing group mapping for service myservice'
+
+
+class TestNvmeofTopValidateArgs:
+    base_args = {
+        'sort_by': 'Thread Name',
+        'sort_descending': False,
+        'with_timestamp': False,
+        'no_header': False,
+        'server_address': '',
+        'server_port': None,
+        'gw_group': '',
+        'period': 1,
+        'session_id': None,
+    }
+
+    def _validate(self, **overrides):
+        args = {**self.base_args, **overrides}
+        return NVMeoFTopCPU(args)._validate_args()  # pylint: disable=protected-access
+
+    def test_valid_period(self):
+        assert self._validate(period=5) is None
+
+    def test_invalid_period_too_low(self):
+        rc, msg = self._validate(period=0)
+        assert rc == -errno.EINVAL
+        assert msg == f"Invalid period '0': must be between 1 and {MAX_SESSION_TTL}"
+
+    def test_invalid_period_too_high(self):
+        rc, msg = self._validate(period=999999)
+        assert rc == -errno.EINVAL
+        assert msg == f"Invalid period '999999': must be between 1 and {MAX_SESSION_TTL}"
+
+    def test_valid_server_address(self):
+        assert self._validate(server_address='1.2.3.4') is None
+
+    def test_invalid_server_address(self):
+        rc, msg = self._validate(server_address='not-an-ip')
+        assert rc == -errno.EINVAL
+        assert msg == "Invalid server-address 'not-an-ip': must be a valid IP address"
+
+    def test_valid_server_address_ipv6(self):
+        assert self._validate(server_address='::1') is None
+
+    def test_valid_server_port(self):
+        assert self._validate(server_address='1.2.3.4', server_port=5500) is None
+
+    def test_invalid_server_port_zero(self):
+        rc, msg = self._validate(server_address='1.2.3.4', server_port=0)
+        assert rc == -errno.EINVAL
+        assert msg == "Invalid server-port '0': must be between 1 and 65535"
+
+    def test_invalid_server_port_too_high(self):
+        rc, msg = self._validate(server_address='1.2.3.4', server_port=65536)
+        assert rc == -errno.EINVAL
+        assert msg == "Invalid server-port '65536': must be between 1 and 65535"
+
+    def test_port_without_address_is_valid(self):
+        assert self._validate(server_port=5500) is None
 
 
 class TestNvmeofTopCommands(CLICommandTestMixin):
