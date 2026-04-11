@@ -30,13 +30,6 @@ else:
     def get_collector(session_id: Optional[str]):
         return mgr.get_nvmeof_collector(session_id, MAX_SESSION_TTL)
 
-    def _extract_host(addr: str) -> str:
-        if addr.startswith('['):       # [ipv6] or [ipv6]:5500
-            return addr.split(']')[0].lstrip('[')
-        if addr.count(':') == 1:       # ipv4:5500
-            return addr.rsplit(':', 1)[0]
-        return addr                    # bare IPv4 or bare IPv6
-
     def get_lbg_gws_map(service_name: str):
         pool_group = get_pool_group_name(service_name)
         if not pool_group:
@@ -371,7 +364,8 @@ else:
                 self.clients[key] = NVMeoFClient(group, server_addr)
             return self.clients[key]
 
-        def _set_gateways(self, addr_filter: str, group_filter: str):
+        def _set_gateways(self, group_filter: str, addr_filter: str,
+                          port_filter: Optional[int] = None):
             if self.service and self.group:
                 return
 
@@ -394,8 +388,10 @@ else:
             matched_gws = []
             for svc_name, svc_gateways in services.items():
                 for gw in svc_gateways:
-                    if addr_filter and (
-                            _extract_host(addr_filter) != _extract_host(gw['service_url'])):
+                    gw_host, _, gw_port = gw['service_url'].rpartition(':')
+                    gw_host = gw_host.strip('[]')
+                    if (addr_filter and addr_filter != gw_host) or \
+                            (port_filter and str(port_filter) != gw_port):
                         continue
                     if group_filter and gw.get('group') != group_filter:
                         if addr_filter:
@@ -428,8 +424,9 @@ else:
             self.tool = tool
 
             self._set_gateways(
+                group_filter=tool.args.get('gw_group', ''),
                 addr_filter=tool.args.get('server_address', ''),
-                group_filter=tool.args.get('gw_group', '')
+                port_filter=tool.args.get('server_port')
             )
             if not self.ready:
                 return
@@ -521,11 +518,16 @@ else:
             server_address = self.args.get('server_address', '')
             if server_address:
                 try:
-                    ipaddress.ip_address(_extract_host(server_address))
-                except Exception:  # pylint: disable=broad-except
+                    ipaddress.ip_address(server_address)
+                except ValueError:
                     return (-errno.EINVAL,
                             f"Invalid server-address '{server_address}': "
-                            "must be a valid IP address or IP:port")
+                            "must be a valid IP address")
+            server_port = self.args.get('server_port')
+            if server_port is not None and not 1 <= server_port <= 65535:
+                return (-errno.EINVAL,
+                        f"Invalid server-port '{server_port}': "
+                        "must be between 1 and 65535")
             return None
 
         def run(self) -> tuple:
@@ -658,7 +660,8 @@ else:
             return ''.join(rows)
 
     @DBCLICommand.Read('nvmeof top cpu', poll=True)
-    def nvmeof_top_cpu(_, server_address: str = '', gw_group: str = '',
+    def nvmeof_top_cpu(_, server_address: str = '', server_port: Optional[int] = None,
+                       gw_group: str = '',
                        descending: bool = False, sort_by: str = 'Thread Name',
                        with_timestamp: bool = False,
                        no_header: bool = False,
@@ -678,6 +681,7 @@ else:
             'sort_descending': descending,
             'sort_by': sort_by,
             'server_address': server_address,
+            'server_port': server_port,
             'gw_group': gw_group,
             'period': period,
             'session_id': session_id,
@@ -689,7 +693,8 @@ else:
 
     @DBCLICommand.Read('nvmeof top io', poll=True)
     def nvmeof_top_io(_, nqn: str = '',
-                      server_address: str = '', gw_group: str = '',
+                      server_address: str = '', server_port: Optional[int] = None,
+                      gw_group: str = '',
                       descending: bool = False, sort_by: str = 'NSID',
                       with_timestamp: bool = False,
                       summary: bool = False, no_header: bool = False,
@@ -716,6 +721,7 @@ else:
             'sort_descending': descending,
             'sort_by': sort_by,
             'server_address': server_address,
+            'server_port': server_port,
             'gw_group': gw_group,
             'period': period,
             'session_id': session_id,
