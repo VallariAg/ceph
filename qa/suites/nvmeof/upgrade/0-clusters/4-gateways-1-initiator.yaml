@@ -17,12 +17,15 @@ roles:
   - ceph.nvmeof.nvmeof.b
 - - host.c
   - mon.c
+  - mgr.z
   - osd.5
   - osd.6
   - osd.7
   - client.3
   - ceph.nvmeof.nvmeof.c
 - - host.d
+  - mon.d
+  - mgr.k
   - client.4
   - ceph.nvmeof.nvmeof.d
 

@@ -4,7 +4,16 @@ tasks:
     mon.a:
       - while ceph orch upgrade status | jq '.in_progress' | grep true && ! ceph orch upgrade status | jq '.message' | grep Error ; do ceph orch ps ; ceph versions ; ceph orch upgrade status ; ceph health detail ; sleep 30 ; done
       - ceph config get mgr mgr/cephadm/container_image_nvmeof
+      - ceph orch ps
       - sleep 60
+      # debugging
+      - ceph config get mgr mgr/cephadm/container_image_nvmeof
+      - ceph nvme-gw show mypool mygroup0
+      - ceph orch ps
+      - ceph -s
+      - ceph version 
+      - ceph -v 
+      - cephadm version
       # print status after upgrade
       - ceph orch ps
       - ceph orch ps | grep "nvmeof" || exit 1
