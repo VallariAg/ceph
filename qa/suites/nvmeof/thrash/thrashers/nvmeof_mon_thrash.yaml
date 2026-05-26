@@ -30,7 +30,7 @@ tasks:
 
 - exec:
     host.a:
-      - ceph config set mon mon_nvmeofgw_beacon_grace 12
+      - ceph config set mon mon_nvmeofgw_beacon_grace 10
 
 - mon_thrash:
     revive_delay: 60
