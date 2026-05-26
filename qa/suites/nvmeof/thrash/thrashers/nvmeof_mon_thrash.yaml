@@ -35,6 +35,7 @@ tasks:
 - mon_thrash:
     revive_delay: 60
     thrash_delay: 60
+    seed: 1779363601
     thrash_many: true
     # switch_thrashers: True
     logger: '[nvmeof.thrasher.mon_thrasher]'
