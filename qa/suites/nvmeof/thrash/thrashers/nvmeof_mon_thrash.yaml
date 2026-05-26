@@ -28,6 +28,10 @@ tasks:
     # checker_host: 'client.0'
     # switch_thrashers: True
 
+- exec:
+    host.a:
+      - ceph config set mon mon_nvmeofgw_beacon_grace 12
+
 - mon_thrash:
     revive_delay: 60
     thrash_delay: 60
