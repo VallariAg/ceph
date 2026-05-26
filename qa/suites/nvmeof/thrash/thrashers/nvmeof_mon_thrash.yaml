@@ -29,6 +29,7 @@ tasks:
     # switch_thrashers: True
 
 - mon_thrash:
+    seed: 1779363601
     revive_delay: 60
     thrash_delay: 60
     thrash_many: true
