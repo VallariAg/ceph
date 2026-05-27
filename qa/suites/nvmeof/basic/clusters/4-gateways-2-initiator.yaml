@@ -36,4 +36,5 @@ overrides:
       - OSD_ROOT_DOWN
       - PG_DEGRADED
       - NVMEOF_SINGLE_GATEWAY
+      - have only 1 nvmeof gateway
       - CEPHADM_FAILED_DAEMON
