@@ -30,6 +30,7 @@ tasks:
     checker_host: 'client.0'
     switch_thrashers: True
     switch_thrashers_wait: 1000
+    seed: 1779198495
 
 - mon_thrash:
     revive_delay: 60
@@ -38,3 +39,4 @@ tasks:
     switch_thrashers: True
     switch_thrashers_wait: 1000
     logger: '[nvmeof.thrasher.mon_thrasher]'
+    seed: 1779198497
