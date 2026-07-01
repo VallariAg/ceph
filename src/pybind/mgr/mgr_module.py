@@ -422,7 +422,7 @@ class CLICommandBase(object):
         self.arg_spec = {}    # type: Dict[str, Any]
         self.first_default = -1
 
-    KNOWN_ARGS = '_', 'self', 'mgr', 'inbuf', 'return'
+    KNOWN_ARGS = '_', 'self', 'mgr', 'inbuf', 'return', 'session_id'
 
     @classmethod
     def _load_func_metadata(cls: Any, f: HandlerFuncType) -> Tuple[str, Dict[str, Any], int, str]:
@@ -531,6 +531,10 @@ class CLICommandBase(object):
                     'Invalid command: Input file data (-i) not supported',
                 )
             kwargs['inbuf'] = inbuf
+        if 'session_id' in specials:
+            session_id = cmd_dict.get('session_id')
+            if session_id is not None:
+                kwargs['session_id'] = session_id
         assert self.func
         return self.func(mgr, **kwargs)
 
