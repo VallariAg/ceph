@@ -286,6 +286,41 @@ else:
             reactor_data.sort(key=lambda t: t[sort_pos], reverse=reverse_sort)
             return reactor_data
 
+        def get_host_controller_data(self, sort_pos: int, reverse_sort: bool):
+            ctrl_data = []
+            for (gw_addr, size_kb), io_stats in self.controller_stats.items():
+                r_iops = r_bdev = r_net = r_qos = r_total = None
+                read_stats = io_stats.get('read')
+                if read_stats:
+                    read_stats.calculate(self.delay)
+                    r_iops = read_stats.ops_rate
+                    r_bdev = read_stats.bdev_mean
+                    r_net = read_stats.net_mean
+                    r_qos = max(0.0, read_stats.qos_mean)
+                    r_total = read_stats.total_mean
+
+                w_iops = w_bdev = w_net = w_qos = w_total = None
+                write_stats = io_stats.get('write')
+                if write_stats:
+                    write_stats.calculate(self.delay)
+                    w_iops = write_stats.ops_rate
+                    w_bdev = write_stats.bdev_mean
+                    w_net = write_stats.net_mean
+                    w_qos = max(0.0, write_stats.qos_mean)
+                    w_total = write_stats.total_mean
+
+                total_iops = (r_iops or 0.0) + (w_iops or 0.0)
+
+                ctrl_data.append((
+                    gw_addr, f"{size_kb}KB", total_iops,
+                    r_iops, r_bdev, r_net, r_qos, r_total,
+                    w_iops, w_bdev, w_net, w_qos, w_total,
+                ))
+
+            ctrl_data.sort(key=lambda t: t[sort_pos] if t[sort_pos] is not None else 0.0,
+                           reverse=reverse_sort)
+            return ctrl_data
+
         def get_subsystem_summary_data(self):
             return [
                 self.subsystem_nqn,
@@ -560,13 +595,15 @@ else:
                     continue
                 gw_addr = client.gateway_addr
                 for bucket in ret.buckets:
+                    key = (gw_addr, bucket.size)
                     for io_type, lat_group in (('read', bucket.read), ('write', bucket.write)):
                         if not lat_group.io_count:
                             continue
-                        key = (gw_addr, bucket.size, io_type)
                         if key not in self.controller_stats:
-                            self.controller_stats[key] = ControllerBucketStats()
-                        self.controller_stats[key].update(
+                            self.controller_stats[key] = {}
+                        if io_type not in self.controller_stats[key]:
+                            self.controller_stats[key][io_type] = ControllerBucketStats()
+                        self.controller_stats[key][io_type].update(
                             lat_group.io_count,
                             lat_group.bdev.mean,
                             lat_group.net.mean,
@@ -732,9 +769,16 @@ else:
             return ''.join(rows)
 
     class NVMeoFTopHostController(NVMeoFTopTool):
-        controller_headers = ['Gateway', 'Size', 'Type', 'IOPS',
-                              'BDEV µs', 'Net µs', 'QoS µs', 'Total µs']
-        controller_template = "{:<20}   {:>5}   {:<5}   {:>7}   {:>8}   {:>7}   {:>7}   {:>9}\n"
+        controller_headers = [
+            'Gateway', 'Size', 'Total IOPS',
+            'rIOPS', 'rBDEV µs', 'rNet µs', 'rQoS µs', 'rTotal µs',
+            'wIOPS', 'wBDEV µs', 'wNet µs', 'wQoS µs', 'wTotal µs',
+        ]
+        controller_template = (
+            "{:<20}   {:>6}   {:>10}"
+            "   {:>6}   {:>8}   {:>7}   {:>7}   {:>8}"
+            "   {:>6}   {:>8}   {:>7}   {:>7}   {:>8}\n"
+        )
 
         def __init__(self, args: dict):
             super().__init__(args)
@@ -760,23 +804,19 @@ else:
             if self.args.get('summary'):
                 rows.append(f"Host: {self.host_nqn}  Subsystem: {self.nqn}\n\n")
 
-            ctrl_data = []
-            for (gw_addr, size_kb, io_type), stats in self.collector.controller_stats.items():
-                stats.calculate(self.collector.delay)
-                ctrl_data.append((gw_addr, f"{size_kb}KB", io_type.capitalize(),
-                                   stats.ops_rate, stats.bdev_mean,
-                                   stats.net_mean, stats.qos_mean, stats.total_mean))
-
-            ctrl_data.sort(key=lambda t: t[sort_pos], reverse=self.reverse_sort)
+            ctrl_data = self.collector.get_host_controller_data(
+                sort_pos=sort_pos, reverse_sort=self.reverse_sort)
 
             if not self.args.get('no_header'):
                 rows.append(NVMeoFTopHostController.controller_template.format(
                     *NVMeoFTopHostController.controller_headers))
             if ctrl_data:
                 for row in ctrl_data:
-                    rows.append(NVMeoFTopHostController.controller_template.format(
-                        *[f"{v:.0f}" if isinstance(v, float) else v for v in row]
-                    ))
+                    formatted = [
+                        '-' if v is None else (f"{v:.0f}" if isinstance(v, float) else v)
+                        for v in row
+                    ]
+                    rows.append(NVMeoFTopHostController.controller_template.format(*formatted))
             else:
                 rows.append("<no IO statistics available>\n")
 
