@@ -90,7 +90,7 @@ echo "[nvmeof.mtls] TEST PASSED with certs in spec file (server/client + root CA
 echo "[nvmeof.mtls] Starting test with cephadm-signed cert (ssl=true + enable_auth=true, no certs)"
 
 # deploy mtls with cephadm-signed certs
-sudo /tmp/yq '.spec.enable_auth=true | .spec.ssl=true' /tmp/gw-conf-original.yaml > /tmp/gw-conf-cephadm-certs.yaml
+sudo /tmp/yq '.spec.enable_auth=true' /tmp/gw-conf-original.yaml > /tmp/gw-conf-cephadm-certs.yaml
 cat /tmp/gw-conf-cephadm-certs.yaml
 ceph orch apply -i /tmp/gw-conf-cephadm-certs.yaml
 ceph orch redeploy nvmeof.mypool.mygroup0
@@ -124,6 +124,16 @@ do
         -v /tmp/cephadm_client.key:/client.key:z  \
         -it $NVMEOF_CLI_IMAGE --server-address $ip --server-port $NVMEOF_SRPORT \
         --client-key /client.key --client-cert /client.crt --server-cert /server.crt --format json subsystem list
+
+    set +e
+    sudo podman run -it $NVMEOF_CLI_IMAGE --server-address $ip --server-port $NVMEOF_SRPORT --format json subsystem list
+    rc=$?
+    set -e
+    if [ "$rc" -eq 0 ]; then
+        echo "[nvmeof.mtls] ERROR: container CLI unexpectedly succeeded (exit code 0) without certs"
+        exit 1
+    fi
+    echo "[nvmeof.mtls] container CLI correctly failed (exit code $rc) without certs, as expected"
 done
 
 # remove mtls
