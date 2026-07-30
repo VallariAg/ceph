@@ -27,10 +27,12 @@ overrides:
 
 tasks:
 - nvmeof.thrash:
+    seed: 1785296595
     checker_host: 'client.0'
     switch_thrashers: True
 
 - mon_thrash:
+    seed: 1785296597
     revive_delay: 60
     thrash_delay: 60
     thrash_many: true

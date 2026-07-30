@@ -369,7 +369,8 @@ class NvmeofThrasher(Thrasher, Greenlet):
     def log(self, x):
         self.logger.info(x)
 
-    def _run(self): # overriding 
+    def _run(self): # overriding
+        watcher = Greenlet.spawn(self._watch_apply_spec_fail)
         try:
             self.do_thrash()
         except Exception as e:
@@ -377,7 +378,32 @@ class NvmeofThrasher(Thrasher, Greenlet):
             self.logger.exception("exception:")
             # allow successful completion so gevent doesn't see an exception...
             # The DaemonWatchdog will observe the error and tear down the test.
-    
+        finally:
+            watcher.kill()
+
+    def _watch_apply_spec_fail(self, service_name='nvmeof.mypool.mygroup0', poll_interval=3): 
+        seen = False
+        while not self.stopping.is_set():
+            try:
+                health = json.loads(self.checker_host.sh(
+                    ['ceph', 'health', 'detail', '--format', 'json'], check_status=False))
+                active = 'CEPHADM_APPLY_SPEC_FAIL' in health.get('checks', {})
+            except Exception:
+                active = False
+
+            if active and not seen:
+                seen = True
+                self.log('CEPHADM_APPLY_SPEC_FAIL detected - capturing host/inventory/spec state')
+                self.checker_host.run(args=['ceph', 'orch', 'host', 'ls', '--format', 'json'])
+                self.checker_host.run(args=['ceph', 'config-key', 'get', 'mgr/cephadm/inventory'])
+                self.checker_host.run(args=[
+                    'ceph', 'orch', 'ls', '--service-name', service_name, '--format', 'yaml'
+                ])
+            elif not active:
+                seen = False  # re-arm in case it recurs later in the run
+
+            self.stopping.wait(poll_interval)
+
     def stop(self):
         self.stopping.set()
 
