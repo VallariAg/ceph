@@ -1,9 +1,11 @@
 use_shaman: True
 tasks:
 - install:
+    tag: v21.1.2
     extra_packages:
         - nvme-cli
 - cephadm:
+    image: quay.io/ceph/ceph:v21.1.2
 - cephadm.shell:
     host.a:
     # https://tracker.ceph.com/issues/75452
