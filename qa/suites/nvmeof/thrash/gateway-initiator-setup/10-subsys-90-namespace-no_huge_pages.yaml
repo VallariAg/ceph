@@ -22,7 +22,10 @@ tasks:
       - cat /tmp/nvmeof-no-huge-page.yaml
       - ceph orch ls
       - ceph orch apply -i /tmp/nvmeof-no-huge-page.yaml
-      - ceph orch redeploy nvmeof.mypool.mygroup0
+      # TEMPORARY: redeploy each gateway daemon one-by-one instead of
+      # `ceph orch redeploy <service>`, which cephadm staggers ~1 gw / 10 min and
+      # makes spec changes take too long to reach every gateway.
+      - "for d in $(ceph orch ps --service-name nvmeof.mypool.mygroup0 --format json | jq -r '.[].daemon_name'); do ceph orch daemon redeploy $d; sleep 60; done"
       
 - cephadm.wait_for_service:
     service: nvmeof.mypool.mygroup0

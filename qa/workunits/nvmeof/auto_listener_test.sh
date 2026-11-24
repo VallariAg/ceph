@@ -49,6 +49,26 @@ wait_for_service() {
     exit 1
 }
 
+# TEMPORARY workaround: cephadm's service-level `ceph orch redeploy <service>`
+# restarts gateways staggered (~1 every 10 min), so a spec change is not applied to
+# every gateway for a long time and tests race (e.g. only one gateway sees a new
+# auto-listener). Redeploy each daemon explicitly so the new spec applies to all
+# gateways promptly, waiting for each to come back before moving to the next.
+redeploy_nvmeof_service() {
+    local service="nvmeof.mypool.mygroup0"
+    local daemon i state
+    for daemon in $(ceph orch ps --service-name "$service" --format json | jq -r '.[].daemon_name'); do
+        echo "[nvmeof.auto_listener] redeploying daemon $daemon"
+        ceph orch daemon redeploy "$daemon"
+        for ((i=1; i<=30; i++)); do
+            state=$(ceph orch ps --service-name "$service" --format json \
+                | jq -r --arg d "$daemon" '.[] | select(.daemon_name==$d) | .status_desc')
+            [ "$state" = "running" ] && break
+            sleep 10
+        done
+    done
+}
+
 assert_fails() { # assert that $@ command fails (non-zero exit)
     local rc=0
     set +e
@@ -197,7 +217,7 @@ sed "/^  group:/a\\  listener_network_masks: [\"$SUBNET_MASK\"]" \
     /tmp/gw-conf-original.yaml > /tmp/gw-conf-with-listener-masks.yaml
 cat /tmp/gw-conf-with-listener-masks.yaml
 ceph orch apply -i /tmp/gw-conf-with-listener-masks.yaml
-ceph orch redeploy nvmeof.mypool.mygroup0
+redeploy_nvmeof_service
 sleep 100
 wait_for_service
 
@@ -244,7 +264,7 @@ assert_subsystem $GROUP_MASK_SUBSYSTEM $SUBNET_MASK
 
 echo "[nvmeof.auto_listener] 8. removing the subnet from the spec and redeploying - the listeners should automatically be removed"
 ceph orch apply -i /tmp/gw-conf-original.yaml
-ceph orch redeploy nvmeof.mypool.mygroup0
+redeploy_nvmeof_service
 sleep 100
 wait_for_service
 retry assert_no_listeners $GROUP_MASK_SUBSYSTEM

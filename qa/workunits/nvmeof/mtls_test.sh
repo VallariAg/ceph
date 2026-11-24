@@ -27,6 +27,26 @@ wait_for_service() {
     exit 1
 }
 
+# TEMPORARY workaround: cephadm's service-level `ceph orch redeploy <service>`
+# restarts gateways staggered (~1 every 10 min), so a spec change is not applied to
+# every gateway for a long time and tests race. Redeploy each daemon explicitly so
+# the new spec applies to all gateways promptly, waiting for each to come back
+# before moving to the next.
+redeploy_nvmeof_service() {
+    local service="nvmeof.mypool.mygroup0"
+    local daemon i state
+    for daemon in $(ceph orch ps --service-name "$service" --format json | jq -r '.[].daemon_name'); do
+        echo "[nvmeof.mtls] redeploying daemon $daemon"
+        ceph orch daemon redeploy "$daemon"
+        for ((i=1; i<=30; i++)); do
+            state=$(ceph orch ps --service-name "$service" --format json \
+                | jq -r --arg d "$daemon" '.[] | select(.daemon_name==$d) | .status_desc')
+            [ "$state" = "running" ] && break
+            sleep 10
+        done
+    done
+}
+
 # https://tracker.ceph.com/issues/76988
 # Retry CLI commands to allow services to fully initialize before queries
 retry() {
@@ -63,7 +83,7 @@ sudo /tmp/yq '.spec.enable_auth=false' -i /tmp/gw-conf-without-mtls.yaml
 # deploy mtls
 cat /tmp/gw-conf-with-mtls.yaml 
 ceph orch apply -i /tmp/gw-conf-with-mtls.yaml
-ceph orch redeploy nvmeof.mypool.mygroup0 
+redeploy_nvmeof_service
 sleep 100
 wait_for_service
 
@@ -87,7 +107,7 @@ done
 # remove mtls
 cat /tmp/gw-conf-without-mtls.yaml 
 ceph orch apply -i /tmp/gw-conf-without-mtls.yaml
-ceph orch redeploy nvmeof.mypool.mygroup0 
+redeploy_nvmeof_service
 sleep 100
 wait_for_service
 
@@ -112,7 +132,7 @@ echo "[nvmeof.mtls] Starting test with cephadm-signed cert (ssl=true + enable_au
 sudo /tmp/yq '.spec.enable_auth=true' /tmp/gw-conf-original.yaml > /tmp/gw-conf-cephadm-certs.yaml
 cat /tmp/gw-conf-cephadm-certs.yaml
 ceph orch apply -i /tmp/gw-conf-cephadm-certs.yaml
-ceph orch redeploy nvmeof.mypool.mygroup0
+redeploy_nvmeof_service
 sleep 100
 wait_for_service
 
@@ -157,7 +177,7 @@ done
 
 # remove mtls
 ceph orch apply -i /tmp/gw-conf-without-mtls.yaml
-ceph orch redeploy nvmeof.mypool.mygroup0
+redeploy_nvmeof_service
 sleep 100
 wait_for_service
 

@@ -454,9 +454,12 @@ class NvmeofThrasher(Thrasher, Greenlet):
 
     def kill_daemon(self, daemon):
         kill_methods = [
-            "ceph_daemon_stop", 
+            "ceph_daemon_stop",
             # "systemctl_stop",
-            "daemon_remove",
+            # TEMP: disabled - 'daemon_remove' relies on cephadm re-creating the
+            # daemon to satisfy placement, which is slow under the staggered
+            # redeploy/reconcile bug and can exceed _wait_for_daemon's timeout.
+            # "daemon_remove",
         ]
         chosen_method = self.rng.choice(kill_methods)
         d_name = '%s.%s' % (daemon.type_, daemon.id_)
